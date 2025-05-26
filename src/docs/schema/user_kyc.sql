@@ -1,5 +1,5 @@
 CREATE TABLE user_kyc (
-    autonid SERIAL PRIMARY KEY,
+    autonid UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     client_id VARCHAR(50),
     cif_id VARCHAR(50),
     stage INTEGER NOT NULL,

@@ -1,6 +1,7 @@
+drop table user_request;
 CREATE TABLE user_request (
-    auto_nid SERIAL PRIMARY KEY,
-    web_cif_nid INTEGER NULL,
+    auto_nid UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    web_cif_nid UUID NULL,
     contact_person_name VARCHAR(50) NULL,
     contact_person_relation VARCHAR(50) NULL,
     contact_person_home_phone VARCHAR(50) NULL,
