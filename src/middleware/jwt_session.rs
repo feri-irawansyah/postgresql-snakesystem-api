@@ -8,7 +8,7 @@ const SECRET_KEY: &[u8] = b"supersecretkey"; // 🔥 Ganti dengan key yang lebih
 #[derive(Debug, Serialize, Deserialize, Clone, ToSchema)]
 pub struct Claims {
     pub result: bool,
-    pub auth_usernid: i32,
+    pub usernid: i32,
     pub email: String,
     pub mobile_phone: String,
     pub disabled_login: bool,
@@ -34,7 +34,7 @@ impl Claims {
             expired_token: expired_token.timestamp(),
             expired_date,
             disabled_login: user.disabled_login,
-            auth_usernid: user.auth_usernid,
+            usernid: user.usernid,
             mobile_phone: user.mobile_phone,
             picture: user.picture,
             register_date: user.register_date,

@@ -6,6 +6,12 @@ pub mod validator {
     use regex::Regex;
     use validator::{ValidationError, ValidationErrors};
 
+    lazy_static::lazy_static! {
+        static ref PASSWORD_REGEX: Regex = Regex::new(
+            r"^(?=.*[A-Z])(?=.*\d)(?=.*[@.,%*()])[A-Za-z\d@.,%*()]{8,}$"
+        ).unwrap();
+    }
+
     pub fn required(value: &str) -> Result<(), ValidationError> {
         if value.trim().is_empty() {
             let mut error = ValidationError::new("required");
@@ -46,14 +52,18 @@ pub mod validator {
     }
 
     pub fn valid_password(value: &str) -> Result<(), ValidationError> {
-        let password_regex = Regex::new(r"^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{8,}$")
-            .map_err(|_| ValidationError::new("invalid_regex"))?;
-
-        if !password_regex.is_match(value) {
+        if value.len() < 8
+            || !value.chars().any(|c| c.is_ascii_uppercase())
+            || !value.chars().any(|c| c.is_ascii_digit())
+            || !value.chars().any(|c| "@.,%*()".contains(c))
+        {
             let mut error = ValidationError::new("invalid_password");
-            error.message = Some("Required character number and text".into());
+            error.message = Some(
+                "Password must be at least 8 characters and include at least one uppercase letter, one number, and one special character (@.,%*())".into(),
+            );
             return Err(error);
         }
+
         Ok(())
     }
 
