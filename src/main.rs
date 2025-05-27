@@ -1,20 +1,22 @@
 use actix_cors::Cors;
-use actix_web::{get, http, web::{self, route, Data, ServiceConfig}, Responder};
+use actix_web::{get, http, web::{self, route, ServiceConfig}, Responder};
 use docs::swagger::{health_check, Swagger};
-use handlers::auth_handler::auth_scope;
+use handlers::{auth_handler::auth_scope, mail_handler::mail_scope};
 use services::generic_service::GenericService;
 use shuttle_actix_web::ShuttleActixWeb;
 use shuttle_runtime::SecretStore;
 use sqlx::{PgPool, postgres::PgPoolOptions};
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
+use once_cell::sync::OnceCell;
+
+pub static CONNECTION: OnceCell<PgPool> = OnceCell::new();
+pub static SECRETS: OnceCell<SecretStore> = OnceCell::new();
 
 #[get("/")]
-async fn hello_world(db: Data<PgPool>) -> impl Responder {
-    // Cek koneksi DB
-    let row = sqlx::query("SELECT * FROM email_history").fetch_all(&**db);
+async fn hello_world() -> impl Responder {
         
-    format!("Hello World! DB returns: {:?}", row.await.inspect(|v| println!("{:?}", v)))
+    format!("Hello World! DB returns")
 }
 
 mod middleware {
@@ -30,6 +32,7 @@ mod services {
 }
 mod handlers {
     pub mod auth_handler;
+    pub mod mail_handler;
 }
 mod utils {
     pub mod api_docs;
@@ -41,40 +44,51 @@ mod docs {
 }
 
 #[shuttle_runtime::main]
-async fn main(#[shuttle_runtime::Secrets] secrets: SecretStore) -> ShuttleActixWeb<impl FnOnce(&mut ServiceConfig) + Send + Clone + 'static> {
+async fn main(
+    #[shuttle_runtime::Secrets] secrets: SecretStore,
+) -> ShuttleActixWeb<impl FnOnce(&mut ServiceConfig) + Send + Clone + 'static> {
     let db_url = secrets.get("DATABASE_URL").expect("DB URL not found");
 
-    let pool = PgPoolOptions::new()
-        .max_connections(5)
+    let pool = match PgPoolOptions::new()
+        .max_connections(3)
+        .idle_timeout(std::time::Duration::from_secs(30))
+        .max_lifetime(std::time::Duration::from_secs(60))
+        .acquire_slow_threshold(std::time::Duration::from_secs(5))
         .connect(&db_url)
-        .await
-        .expect("Failed to connect to database");
+        .await {
+            Ok(p) => p,
+            Err(e) => {
+                eprintln!("Failed to connect to DB: {}", e);
+                panic!("DB connection error");
+            }
+        };
+
+    CONNECTION.set(pool.clone()).expect("Failed to set DB_POOL");
+    SECRETS.set(secrets.clone()).unwrap_or_else(|_| panic!("Failed to set SECRETS"));
 
     let config = move |cfg: &mut ServiceConfig| {
         let cors = Cors::default()
-            .allow_any_origin() // Atau pakai .allow_any_origin() dynamic app https only
-            // .allowed_origin("http://localhost:5173") // url development
-            // .allowed_origin("https://snakesystem.github.io") // url production
+            .allow_any_origin()
             .allowed_methods(vec!["GET", "POST", "OPTIONS"])
             .allowed_headers(vec![http::header::CONTENT_TYPE])
             .max_age(3600)
             .supports_credentials();
-        
-        cfg
-        .service(health_check)
-        .service(
-            web::scope("/api/v1")
-            .wrap(cors)
-            .service(auth_scope())
-        )
-        .service(
-            SwaggerUi::new("/docs/{_:.*}")
-                .url("/api-docs/openapi.json", Swagger::openapi())
-        )
-        .app_data(web::Data::new(pool.clone()))
-        .app_data(web::Data::new(secrets.clone()))
-        .app_data(web::JsonConfig::default().error_handler(GenericService::json_error_handler))
-        .default_service(route().to(GenericService::not_found));
+
+        cfg.service(health_check)
+            .service(
+                web::scope("/api/v1")
+                    .wrap(cors)
+                    .service(mail_scope())
+                    .service(auth_scope()),
+                    
+            )
+            .service(
+                SwaggerUi::new("/docs/{_:.*}")
+                    .url("/api-docs/openapi.json", Swagger::openapi()),
+            )
+            .app_data(web::Data::new(secrets.clone()))
+            .app_data(web::JsonConfig::default().error_handler(GenericService::json_error_handler))
+            .default_service(route().to(GenericService::not_found));
     };
 
     Ok(config.into())

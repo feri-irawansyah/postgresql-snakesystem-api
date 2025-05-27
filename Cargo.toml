@@ -1,9 +1,13 @@
 [package]
 name = "snakesystem-api"
-version = "0.1.0"
+version = "1.0.0"
 edition = "2021"
 
 [dependencies]
+# DEPENDENCIES SWAGGER UI
+utoipa = { version = "5.3.1", features = ["actix_extras", "chrono"] }
+utoipa-swagger-ui = { version = "8.0.1", features = ["actix-web"] }
+
 actix-web = "4.3.1"
 shuttle-actix-web = "0.54.0"
 shuttle-runtime = "0.54.0"
@@ -22,9 +26,8 @@ chrono = { version = "0.4.40", features = ["serde"] }
 validator = { version = "0.20.0", features = ["derive"] }
 image = "0.25.6"
 regex = "1.11.1"
-
-# DEPENDENCIES SWAGGER UI
-utoipa = { version = "5.3.1", features = ["actix_extras", "chrono"] }
-utoipa-swagger-ui = { version = "8.0.1", features = ["actix-web"] }
 lazy_static = "1.5.0"
 chrono-tz = "0.10.3"
+handlebars = "6.3.2"
+lettre = { version = "0.11.15", features = ["smtp-transport", "builder"] }
+once_cell = "1.21.3"

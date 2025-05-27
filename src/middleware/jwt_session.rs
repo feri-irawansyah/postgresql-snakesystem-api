@@ -1,20 +1,20 @@
 use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, Validation};
 use serde::{Deserialize, Serialize};
-use chrono::{DateTime, Duration, Utc};
+use chrono::{Duration, NaiveDateTime, Utc};
 use utoipa::ToSchema;
 
-const SECRET_KEY: &[u8] = b"supersecretkey"; // 🔥 Ganti dengan key yang lebih aman!
+const SECRET_KEY: &str = "supersecretkey"; // 🔥 Ganti dengan key yang lebih aman!
 
 #[derive(Debug, Serialize, Deserialize, Clone, ToSchema)]
 pub struct Claims {
     pub result: bool,
     pub usernid: i32,
     pub email: String,
-    pub mobile_phone: String,
+    pub fullname: String,
     pub disabled_login: bool,
     pub expired_token: i64,
     pub expired_date: String,
-    pub register_date: DateTime<Utc>,
+    pub register_date: NaiveDateTime,
     pub exp: usize,
     pub picture: Option<String>,
     pub comp_name: Option<String>,
@@ -31,14 +31,14 @@ impl Claims {
         Self {
             result: true,
             email: user.email,
+            fullname: user.fullname,
             expired_token: expired_token.timestamp(),
             expired_date,
             disabled_login: user.disabled_login,
             usernid: user.usernid,
-            mobile_phone: user.mobile_phone,
             picture: user.picture,
             register_date: user.register_date,
-            exp, // 🔥 Tambahkan ke struct
+            exp,
             comp_name: user.comp_name,
             ip_address: user.ip_address,
             app_name: user.app_name,
@@ -49,10 +49,12 @@ impl Claims {
 // 🔥 Generate JWT Token
 pub fn create_jwt(user: Claims) -> Result<String, jsonwebtoken::errors::Error> {
     let claims = Claims::new(user); // 🔥 Clone user di sini
+    let mut header = Header::default();
+    header.alg = Algorithm::HS256; // ✅ Set eksplisit algoritma HS256
     let token = encode(
-        &Header::default(),
+        &header,
         &claims,
-        &EncodingKey::from_secret(SECRET_KEY),
+        &EncodingKey::from_secret(SECRET_KEY.as_bytes()),
     )?;
     Ok(token)
 }
@@ -61,7 +63,7 @@ pub fn create_jwt(user: Claims) -> Result<String, jsonwebtoken::errors::Error> {
 pub fn validate_jwt(token: &str) -> Result<Claims, jsonwebtoken::errors::Error> {
     match decode::<Claims>(
         token,
-        &DecodingKey::from_secret(SECRET_KEY),
+        &DecodingKey::from_secret(SECRET_KEY.as_bytes()),
         &Validation::new(Algorithm::HS256),
     ) {
         Ok(token_data) => {

@@ -1,6 +1,7 @@
 use actix_web::{error, HttpRequest, HttpResponse, Responder};
 use rand::{rng, Rng};
 use crate::middleware::model::ActionResult;
+use chrono::TimeZone;
 
 pub struct GenericService;
 
@@ -126,6 +127,13 @@ impl GenericService {
                 }
             })
             .collect()
+    }
+
+    pub fn get_timestamp() -> chrono::NaiveDateTime {
+        let jakarta_time: chrono::DateTime<chrono_tz::Tz> = chrono_tz::Asia::Jakarta.from_utc_datetime(&chrono::Utc::now().naive_utc());
+        let timestamp = jakarta_time.naive_local(); 
+
+        return timestamp
     }
 
 }

@@ -1,16 +1,16 @@
-drop table user_request;
+DROP TABLE user_request;
 CREATE TABLE user_request (
-    auto_nid UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    web_cif_nid UUID NULL,
+    auto_nid SERIAL PRIMARY KEY,
+    web_cif_nid INTEGER NULL,
     contact_person_name VARCHAR(50) NULL,
     contact_person_relation VARCHAR(50) NULL,
     contact_person_home_phone VARCHAR(50) NULL,
     contact_person_mobile_phone VARCHAR(50) NULL,
     contact_person_address VARCHAR(60) NULL,
-    client_birth_date1 TIMESTAMP NULL,
-    client_birth_date2 TIMESTAMP NULL,
-    client_birth_date3 TIMESTAMP NULL,
-    disclaimer TIMESTAMP NULL,
+    client_birth_date1 TIMESTAMPTZ NULL,
+    client_birth_date2 TIMESTAMPTZ NULL,
+    client_birth_date3 TIMESTAMPTZ NULL,
+    disclaimer TIMESTAMPTZ NULL,
     is_mobile BOOLEAN NULL,
     beneficiary_owner INTEGER NULL,
     beneficiary_owner_name VARCHAR(100) NULL,
@@ -18,11 +18,11 @@ CREATE TABLE user_request (
     beneficiary_owner_relation VARCHAR(120) NULL,
     beneficiary_owner_sex INTEGER NULL,
     beneficiary_owner_birth_place VARCHAR(100) NULL,
-    beneficiary_owner_birth_date TIMESTAMP NULL,
+    beneficiary_owner_birth_date TIMESTAMP,
     beneficiary_owner_nationality INTEGER NULL,
     beneficiary_owner_id_card_type INTEGER NULL,
     beneficiary_owner_id_card_number VARCHAR(100) NULL,
-    beneficiary_owner_id_card_expired_date TIMESTAMP NULL,
+    beneficiary_owner_id_card_expired_date TIMESTAMPTZ NOT NULL DEFAULT with_timezone(),
     beneficiary_owner_email VARCHAR(60) NULL,
     beneficiary_owner_npwp_number VARCHAR(100) NULL,
     beneficiary_owner_address1 VARCHAR(60) NULL,
@@ -52,5 +52,6 @@ CREATE TABLE user_request (
     beneficiary_owner_company_country INTEGER NULL,
     beneficiary_owner_fund_source VARCHAR(60) NULL,
     beneficiary_owner_fund_source_text VARCHAR(60) NULL,
-    residency_n_status INTEGER NULL
+    residency_n_status INTEGER NULL,
+    referal VARCHAR(50) NULL
 );
