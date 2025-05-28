@@ -1,9 +1,9 @@
 use std::collections::HashMap;
-
 use actix_web::HttpRequest;
 use sqlx::PgPool;
 use sqlx::Row;
 
+use crate::middleware::jwt_session::validate_jwt;
 use crate::middleware::model::RegisterRequest;
 use crate::CONNECTION;
 use crate::SECRETS;
@@ -64,7 +64,8 @@ impl AuthService {
                 })
             }
             Err(e) => {
-                result.error = Some(e.to_string());
+                result.message = format!("Incorrect email or password");
+                println!("❌ Login Error: {}", e);
             }
         }
 
@@ -257,75 +258,170 @@ impl AuthService {
         return result;
     }
 
-    pub async fn check_session(session: Claims, token: String, cookies: String, delete: bool, update: bool, exist: bool) -> ActionResult<Claims, String> {
+    pub async fn check_session(session: Claims, token: String, cookies: String, delete: bool, update: bool, exist: bool, app_name: &str) -> ActionResult<Claims, String> {
         let mut result: ActionResult<Claims, String> = ActionResult::default();
 
         let connection = CONNECTION.get().expect("DB_POOL not initialized");
         let active_token = if cookies.is_empty() { token.clone() } else { cookies.clone() };
 
-        match connection.begin().await {
-            Ok(mut trans) => {
-                if exist {
-                    let row_count: i32 = sqlx::query(r#"SELECT COUNT(*) as count FROM cookies WHERE user_nid = @P1 AND cookies = @P2"#)
-                        .bind(session.usernid)
-                        .bind(&active_token)
-                        .fetch_one(&mut *trans)
-                        .await
-                        .unwrap()
-                        .get(0);
-
-                    if row_count == 0 {
-                        result.error = Some("Session has expired".to_string());
-                        return result;
-                    }
-
-                    if update {
-                        sqlx::query(r#"UPDATE cookies SET last_update = @P1 WHERE user_nid = @P2 AND token = @P3"#)
-                            .bind(GenericService::get_timestamp())
-                            .bind(session.usernid)
-                            .bind(&active_token)
-                            .execute(&mut *trans)
-                            .await
-                            .unwrap();
-                        result.result = true;
-                    }
-                } else if delete {
-                    sqlx::query(r#"DELETE FROM cookies WHERE user_nid = @P1 AND token = @P2"#)
-                        .bind(session.usernid)
-                        .bind(&active_token)
-                        .execute(&mut *trans)
-                        .await
-                        .unwrap();
-                    result.result = true;
-                } else {
-                    if !cookies.is_empty() {
-                        sqlx::query(r#"INSERT INTO cookies (user_nid, token, last_update) VALUES (@P1, @P2, @P3)"#)
-                            .bind(session.usernid)
-                            .bind(&active_token)
-                            .bind(GenericService::get_timestamp())
-                            .execute(&mut *trans)
-                            .await
-                            .unwrap();
-                        result.result = true;
-                    } else {
-                        let row_option = sqlx::query(r#"SELECT token, last_update FROM cookies WHERE user_nid = @P1 AND token = @P2"#)
-                            .bind(session.usernid)
-                            .bind(&active_token)
-                            .fetch_optional(&mut *trans)
-                            .await
-                            .unwrap();
-                        if let Some(row) = row_option {
-                            let last_update: Option<chrono::NaiveDateTime> = row.try_get("last_update").unwrap_or_default();
-                            let user_token: Option<String> = row.get("token");
-                            
-                        }
-                    }
-                }
-            },
+        let mut trans = match connection.begin().await {
+            Ok(t) => t,
             Err(e) => {
-                result.error = Some(format!("Failed to start transaction: {}", e));
+                result.error = Some(format!("Database error: {}", e));
+                return result;
+            }            
+        };
+
+        if exist {
+            println!("Check Session");
+            let row_count: i64 = match sqlx::query(r#"SELECT COUNT(*) as count FROM cookies WHERE user_nid = $1 AND token_cookie = $2"#)
+                .bind(session.usernid)
+                .bind(&active_token)
+                .fetch_one(&mut *trans)
+                .await {
+                    Ok(row) => row.get("count"),
+                    Err(e) => {
+                        println!("❌ Check Session Error: {}", e);
+                        0i64
+                    }
+                };
+
+            if row_count == 0 {
+                result.error = Some("Session has expired".to_string());
                 return result;
             }
+
+            if update {
+                println!("Update Session 1");
+                if let Err(e) = sqlx::query(r#"UPDATE cookies SET last_update = $1 WHERE user_nid = $2 AND token_cookie = $3"#)
+                    .bind(GenericService::get_timestamp())
+                    .bind(session.usernid)
+                    .bind(&active_token)
+                    .execute(&mut *trans)
+                    .await {
+                        result.error = Some(format!("Failed to update cookies: {}", e));
+                        return result;
+                    };
+                result.result = true;
+            }
+            result.result = true;
+        } else if delete {
+            println!("Delete Session");
+            if let Err(e) = sqlx::query(r#"DELETE FROM cookies WHERE user_nid = $1 AND token_cookie = $2"#)
+                .bind(session.usernid)
+                .bind(&active_token)
+                .execute(&mut *trans)
+                .await {
+                    result.error = Some(format!("Failed to delete cookies: {}", e));
+                    return result;
+                };
+            result.result = true;
+        } else {
+            let mut user_session: Claims = session.clone();
+            if !cookies.is_empty() {
+                println!("Update Session 2: {}", cookies);
+                match  sqlx::query(r#"UPDATE cookies SET token_cookie = $1, last_update = $3 WHERE user_nid = $2"#)
+                    .bind(&active_token)
+                    .bind(session.usernid)
+                    .bind(GenericService::get_timestamp())
+                    .execute(&mut *trans)
+                    .await {
+                        Ok(row) => {
+                            if row.rows_affected() == 0 {
+                                result.error = Some("Session has expired".to_string());
+                            } else {
+                                result.result = true;
+                                result.message = "Session updated successfully".to_string();
+                                result.data = Some(user_session);
+                            }
+                        },
+                        Err(e) => {
+                            result.error = Some(format!("Failed to update cookies: {}", e));
+                            return result;
+                        }
+                    };
+            } else {
+                println!("Check Session 2");
+                let row_option = match sqlx::query(r#"SELECT token_cookie, last_update FROM cookies WHERE user_nid = $1"#)
+                    .bind(session.usernid)
+                    // .bind(&active_token)
+                    .fetch_optional(&mut *trans)
+                    .await {
+                        Ok(row) => row,
+                        Err(e) => {
+                            result.error = Some(format!("Failed to fetch cookies: {}", e));
+                            return result;
+                        }
+                    };
+
+                    println!("{:?}", row_option);
+                if let Some(row) = row_option {
+                    println!("Check Session 3");
+                    let last_update: Option<chrono::NaiveDateTime> = row.get::<chrono::NaiveDateTime, _>("last_update").format("%Y-%m-%d %H:%M:%S").to_string().parse().ok();
+                    let user_token: Option<String> = row.get("token_cookie");
+                    if let Ok(decode_session) = validate_jwt(&user_token.unwrap_or_default()) {
+                        user_session = decode_session;
+                        result.data = Some(user_session);
+                    }
+
+                    println!("Lastupdate: {}, now: {}", last_update.unwrap_or_default().to_string(), GenericService::get_timestamp().to_string());
+                    
+                    let expired_date: chrono::NaiveDateTime = chrono::NaiveDateTime::parse_from_str(
+                        last_update.unwrap_or_default().to_string().as_str(), 
+                        "%Y-%m-%d %H:%M:%S"
+                    ).unwrap_or_else(|_| GenericService::get_timestamp()); // ⏳ Set exp untuk validasi JWT
+
+                    if expired_date > GenericService::get_timestamp() {
+                        result.message = format!(
+                            "This user ({}) with IP:{} is already logged in from another browser/machine (LastUpdate: {}), are you sure you want to kick this logged in user?",
+                            session.email,
+                            session.ip_address.clone().expect("IP address not found"),
+                            last_update.unwrap_or_default().to_string()
+                        );
+                        
+                        result.data = Some(session);
+                        
+                        // nanti ada buat multiple session sama nendang
+                        return result;
+                    } else {
+                        println!("Update cookies 3");
+                        if let Err(e) = sqlx::query(r#"UPDATE cookies SET last_update = $1, token_cookie = $3 WHERE user_nid = $2 AND token_cookie = $3"#)
+                            .bind(GenericService::get_timestamp())
+                            .bind(session.usernid)
+                            .bind(&active_token)
+                            .execute(&mut *trans)
+                            .await {
+                                result.error = Some(format!("Failed to update cookies: {}", e));
+                                return result;
+                            };
+                        result.result = true;
+                    }
+                } else {
+                    println!("Insert cookies");
+                    if let Err(e) = sqlx::query(r#"INSERT INTO cookies (user_nid, token_cookie, app_computer_name, app_ip_address, last_update, app_name) 
+                                VALUES ($1, $2, $3, $4, $5, $6)"#)
+                        .bind(session.usernid)
+                        .bind(&active_token)
+                        .bind(session.comp_name.clone().unwrap_or_default())
+                        .bind(session.ip_address.clone().unwrap_or_default())
+                        .bind(GenericService::get_timestamp())
+                        .bind(app_name)
+                        .execute(&mut *trans)
+                        .await {
+                            result.error = Some(format!("Failed to insert cookies: {}", e));
+                            return result;
+                        };
+                    result.result = true;
+                    user_session.app_name = Some(app_name.to_string());
+                    result.message = "Login successfully".to_string();
+                    result.data = Some(user_session);
+                }
+            }
+        }
+
+        if let Err(e) = trans.commit().await {
+            result.error = Some(format!("Failed to commit transaction: {}", e));
+            return result;
         };
 
         return result;

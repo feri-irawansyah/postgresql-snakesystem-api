@@ -1,32 +1,35 @@
-use actix_web::{cookie::{time, Cookie, SameSite}, post, web, HttpRequest, HttpResponse, Responder, Scope};
+use actix_web::{cookie::{time, Cookie, SameSite}, post, get, web, HttpRequest, HttpResponse, Responder, Scope};
 use validator::Validate;
 
 use crate::{middleware::{
-    jwt_session::{create_jwt, Claims}, 
+    jwt_session::{create_jwt, validate_jwt, Claims}, 
     model::{ActionResult, LoginRequest, RegisterRequest}},
     services::{auth_service::AuthService, generic_service::GenericService
 }};
 
-const APP_NAME: &str = "snakesystem-web-api";
+const APP_NAME: &str = "snakesystem-api";
 
 pub fn auth_scope() -> Scope {
     
     web::scope("/auth")
         .service(login)
+        .service(check_session)
         .service(register)
         .service(activation)
 }
 
 #[post("/login")]
 async fn login(req: HttpRequest, request: web::Json<LoginRequest>) -> impl Responder {
+    
+    let mut result: ActionResult<Claims, _> = AuthService::login(request.into_inner(), &req).await;
 
-    let result: ActionResult<Claims, _> = AuthService::login(request.into_inner(), &req).await;
-
-    let token_cookie = req.cookie("snakesystem").map(|c| c.value().to_string()).unwrap_or_default();
+    let token_cookie = req.cookie(APP_NAME).map(|c| c.value().to_string()).unwrap_or_default();
 
     match result {
         response if response.error.is_some() => {
-            HttpResponse::InternalServerError().json(response)
+            HttpResponse::InternalServerError().json(serde_json::json!({
+                "error": response.error
+            }))
         }, // Jika error, HTTP 500
         response if response.result => {
             if let Some(user) = &response.data {
@@ -34,14 +37,14 @@ async fn login(req: HttpRequest, request: web::Json<LoginRequest>) -> impl Respo
                 match create_jwt(user.clone()) {
                     Ok(token) => {
                         // ✅ Simpan token dalam cookie
-                        // result = AuthService::check_session(connection.get_ref(), user.clone(), token.clone(), token_cookie.clone(), false, false, false).await;
+                        result = AuthService::check_session(user.clone(), token.clone(), "".to_string(), false, false, false, APP_NAME).await;
 
                         // ✅ Jika berhasil, kembalikan JSON response
-                        // if !result.result {
-                        //     return HttpResponse::InternalServerError().json(result);
-                        // }
+                        if !result.result {
+                            return HttpResponse::InternalServerError().json(serde_json::json!({ "error": result.error }));
+                        }
                             
-                        let cookie = Cookie::build("snakesystem", token_cookie.is_empty().then(|| token.clone()).unwrap_or(token_cookie.clone()))
+                        let cookie = Cookie::build(APP_NAME, token)
                             .path("/")
                             .http_only(true)
                             .same_site(SameSite::None) // ❗ WAJIB None agar cookie cross-site
@@ -51,18 +54,64 @@ async fn login(req: HttpRequest, request: web::Json<LoginRequest>) -> impl Respo
 
                         return HttpResponse::Ok()
                             .cookie(cookie)
-                            .json(response);
+                            .json(serde_json::json!({ "data": result.message }));
                     }
                     Err(err) => {
                         println!("❌ Failed to create JWT: {}", err);
-                        return HttpResponse::InternalServerError().json(response);
+                        return HttpResponse::InternalServerError().json(serde_json::json!({ "error": "Failed to create JWT" }));
                     }
                 }
             }
 
             HttpResponse::BadRequest().json(response) // Jika tidak ada user, return 400
         },
-        response => HttpResponse::BadRequest().json(response), // Jika gagal login, HTTP 400
+        response => HttpResponse::BadRequest().json(serde_json::json!({ "error": response.message })), // Jika gagal login, HTTP 400
+    }
+}
+
+#[get("/session")]
+async fn check_session(req: HttpRequest) -> impl Responder {
+
+    let mut result: ActionResult<Claims, _> = ActionResult::default();
+
+    // Ambil cookie "token"
+    let token_cookie = req.cookie(APP_NAME);
+
+    // Cek apakah token ada di cookie
+    let token = match token_cookie {
+        Some(cookie) => cookie.value().to_string(),
+        None => {
+            result.error = Some("Token not found".to_string());
+            return HttpResponse::Unauthorized().json(result);
+        }
+    };
+
+    // Validate token
+    match validate_jwt(&token) {
+        Ok(claims) => {
+            result = AuthService::check_session(claims.clone(), token.clone(), token.clone(), false, false, true, APP_NAME).await;
+
+            match result {
+                response if response.error.is_some() => {
+                    HttpResponse::InternalServerError().json(serde_json::json!({
+                        "error": response.error
+                    }))
+                },
+                response if response.result => {
+                    
+                    HttpResponse::Ok().json({
+                        serde_json::json!({
+                            "data": Some(claims.clone())
+                        })
+                    })
+                },
+                response => HttpResponse::BadRequest().json(serde_json::json!({ "error": response.message })), // Jika gagal login, HTTP 400
+            }
+        },
+        Err(err) => {
+            result.error = Some(err.to_string());
+            HttpResponse::Unauthorized().json(serde_json::json!({ "error": result.error }))
+        },
     }
 }
 
