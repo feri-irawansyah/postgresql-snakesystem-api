@@ -3,7 +3,9 @@ use serde::{Deserialize, Serialize};
 use chrono::{Duration, NaiveDateTime, Utc};
 use utoipa::ToSchema;
 
-const SECRET_KEY: &str = "supersecretkey"; // 🔥 Ganti dengan key yang lebih aman!
+use crate::SECRETS;
+
+// const SECRET_KEY: &str = "supersecretkey"; // 🔥 Ganti dengan key yang lebih aman!
 
 #[derive(Debug, Serialize, Deserialize, Clone, ToSchema)]
 pub struct Claims {
@@ -24,7 +26,7 @@ pub struct Claims {
 
 impl Claims {
     pub fn new(user: Claims) -> Self {
-        let expired_token = Utc::now() + Duration::days(7); // Token berlaku 7 hari
+        let expired_token = Utc::now() + Duration::days(2); // Token berlaku 2 hari
         let expired_date = expired_token.format("%Y-%m-%d %H:%M:%S").to_string();
         let exp = expired_token.timestamp() as usize; // ⏳ Set exp untuk validasi JWT
 
@@ -48,22 +50,26 @@ impl Claims {
 
 // 🔥 Generate JWT Token
 pub fn create_jwt(user: Claims) -> Result<String, jsonwebtoken::errors::Error> {
+    let secrets = SECRETS.get().expect("SECRETS not initialized");
+    let secret_key = secrets.get("JWT_SECRET").expect("secret was not found");
     let claims = Claims::new(user); // 🔥 Clone user di sini
     let mut header = Header::default();
     header.alg = Algorithm::HS256; // ✅ Set eksplisit algoritma HS256
     let token = encode(
         &header,
         &claims,
-        &EncodingKey::from_secret(SECRET_KEY.as_bytes()),
+        &EncodingKey::from_secret(secret_key.as_bytes()),
     )?;
     Ok(token)
 }
 
 // 🔥 Validate JWT Token
 pub fn validate_jwt(token: &str) -> Result<Claims, jsonwebtoken::errors::Error> {
+    let secrets = SECRETS.get().expect("SECRETS not initialized");
+    let secret_key = secrets.get("JWT_SECRET").expect("secret was not found");
     match decode::<Claims>(
         token,
-        &DecodingKey::from_secret(SECRET_KEY.as_bytes()),
+        &DecodingKey::from_secret(secret_key.as_bytes()),
         &Validation::new(Algorithm::HS256),
     ) {
         Ok(token_data) => {

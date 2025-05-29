@@ -5,6 +5,7 @@ use sqlx::Row;
 
 use crate::middleware::jwt_session::validate_jwt;
 use crate::middleware::model::RegisterRequest;
+use crate::middleware::model::ResetPasswordRequest;
 use crate::CONNECTION;
 use crate::SECRETS;
 use crate::{middleware::{crypto::encrypt_text, jwt_session::Claims, model::{ActionResult, LoginRequest}}, services::generic_service::GenericService};
@@ -14,7 +15,7 @@ use super::mail_service::MailService;
 pub struct AuthService;
 
 impl AuthService {
-    pub async fn login(request: LoginRequest, req: &HttpRequest) -> ActionResult<Claims, String> {
+    pub async fn login(request: LoginRequest, req: &HttpRequest, app_name: &str) -> ActionResult<Claims, String> {
 
         let connection: &PgPool = CONNECTION.get().unwrap();
         let mut result = ActionResult::default();
@@ -60,7 +61,7 @@ impl AuthService {
                     exp: 0,
                     comp_name: Some(GenericService::get_device_name(req)),
                     ip_address: Some(GenericService::get_ip_address(req)),
-                    app_name: Some("".to_string()),
+                    app_name: Some(app_name.to_string()),
                 })
             }
             Err(e) => {
@@ -179,7 +180,7 @@ impl AuthService {
         let mut mail_data = HashMap::new();
         mail_data.insert("FirstName".to_string(), request.full_name);
         mail_data.insert("ActivationURL".to_string(), Some(format!("{}/{}", front_url, otp_generated_link)));
-        mail_data.insert("CompanyName".to_string(), Some("PT. MICRO PIRANTI COMPUTER".to_string()));
+        mail_data.insert("CompanyName".to_string(), Some("PT. TECH SNAKE SYSTEM".to_string()));
         mail_data.insert("subject".to_string(), Some("Verifikasi Akun Anda".to_string()));
         mail_data.insert("email".to_string(), request.email);
 
@@ -354,10 +355,9 @@ impl AuthService {
                         }
                     };
 
-                    println!("{:?}", row_option);
                 if let Some(row) = row_option {
                     println!("Check Session 3");
-                    let last_update: Option<chrono::NaiveDateTime> = row.get::<chrono::NaiveDateTime, _>("last_update").format("%Y-%m-%d %H:%M:%S").to_string().parse().ok();
+                    let last_update: Option<chrono::DateTime<chrono::Utc>> = row.get("last_update");
                     let user_token: Option<String> = row.get("token_cookie");
                     if let Ok(decode_session) = validate_jwt(&user_token.unwrap_or_default()) {
                         user_session = decode_session;
@@ -365,16 +365,11 @@ impl AuthService {
                     }
 
                     println!("Lastupdate: {}, now: {}", last_update.unwrap_or_default().to_string(), GenericService::get_timestamp().to_string());
-                    
-                    let expired_date: chrono::NaiveDateTime = chrono::NaiveDateTime::parse_from_str(
-                        last_update.unwrap_or_default().to_string().as_str(), 
-                        "%Y-%m-%d %H:%M:%S"
-                    ).unwrap_or_else(|_| GenericService::get_timestamp()); // ⏳ Set exp untuk validasi JWT
-
+                    let expired_date: chrono::NaiveDateTime = last_update.unwrap_or_default().naive_utc();
                     if expired_date > GenericService::get_timestamp() {
                         result.message = format!(
                             "This user ({}) with IP:{} is already logged in from another browser/machine (LastUpdate: {}), are you sure you want to kick this logged in user?",
-                            session.email,
+                            session.fullname,
                             session.ip_address.clone().expect("IP address not found"),
                             last_update.unwrap_or_default().to_string()
                         );
@@ -385,7 +380,7 @@ impl AuthService {
                         return result;
                     } else {
                         println!("Update cookies 3");
-                        if let Err(e) = sqlx::query(r#"UPDATE cookies SET last_update = $1, token_cookie = $3 WHERE user_nid = $2 AND token_cookie = $3"#)
+                        if let Err(e) = sqlx::query(r#"UPDATE cookies SET last_update = $1, token_cookie = $3 WHERE user_nid = $2"#)
                             .bind(GenericService::get_timestamp())
                             .bind(session.usernid)
                             .bind(&active_token)
@@ -395,6 +390,7 @@ impl AuthService {
                                 return result;
                             };
                         result.result = true;
+                        result.message = "Session updated successfully".to_string();
                     }
                 } else {
                     println!("Insert cookies");
@@ -404,7 +400,7 @@ impl AuthService {
                         .bind(&active_token)
                         .bind(session.comp_name.clone().unwrap_or_default())
                         .bind(session.ip_address.clone().unwrap_or_default())
-                        .bind(GenericService::get_timestamp())
+                        .bind(GenericService::get_timestamp().checked_add_days(chrono::Days::new(2)).unwrap_or_default())
                         .bind(app_name)
                         .execute(&mut *trans)
                         .await {
@@ -417,6 +413,51 @@ impl AuthService {
                     result.data = Some(user_session);
                 }
             }
+        }
+
+        if let Err(e) = trans.commit().await {
+            result.error = Some(format!("Failed to commit transaction: {}", e));
+            return result;
+        };
+
+        return result;
+    }
+
+    pub async fn reset_password(request: ResetPasswordRequest) -> ActionResult<String, String> {
+        let mut result: ActionResult<String, String> = ActionResult::default();
+
+        let connection = CONNECTION.get().expect("DB_POOL not initialized");
+
+        let mut trans = match connection.begin().await {
+            Ok(t) => t,
+            Err(e) => {
+                result.error = Some(format!("Database error: {}", e));
+                return result;
+            }            
+        };
+
+        let query_result = match sqlx::query(
+            r#"UPDATE users 
+                SET reset_password_key = $1,
+                reset_password_flag = $2,
+                reset_password_date = $3
+                WHERE email = $4"#
+        )
+            .bind(&request.email)
+            .execute(&mut *trans)
+            .await {
+                Ok(row) => row,
+                Err(e) => {
+                    result.error = Some(format!("Failed to insert users: {}", e));
+                    return result;
+                }
+            };
+
+        if query_result.rows_affected() == 1 {
+            result.result = true;
+            result.message = "Reset password successfully".to_string();
+        } else {
+            result.message = "User not found".to_string();
         }
 
         if let Err(e) = trans.commit().await {

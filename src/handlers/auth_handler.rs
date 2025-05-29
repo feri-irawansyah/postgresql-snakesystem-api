@@ -21,9 +21,9 @@ pub fn auth_scope() -> Scope {
 #[post("/login")]
 async fn login(req: HttpRequest, request: web::Json<LoginRequest>) -> impl Responder {
     
-    let mut result: ActionResult<Claims, _> = AuthService::login(request.into_inner(), &req).await;
+    let mut result: ActionResult<Claims, _> = AuthService::login(request.into_inner(), &req, APP_NAME).await;
 
-    let token_cookie = req.cookie(APP_NAME).map(|c| c.value().to_string()).unwrap_or_default();
+    // let token_cookie = req.cookie(APP_NAME).map(|c| c.value().to_string()).unwrap_or_default();
 
     match result {
         response if response.error.is_some() => {
@@ -40,11 +40,12 @@ async fn login(req: HttpRequest, request: web::Json<LoginRequest>) -> impl Respo
                         result = AuthService::check_session(user.clone(), token.clone(), "".to_string(), false, false, false, APP_NAME).await;
 
                         // ✅ Jika berhasil, kembalikan JSON response
-                        if !result.result {
+                        if result.error.is_some() {
                             return HttpResponse::InternalServerError().json(serde_json::json!({ "error": result.error }));
                         }
-                            
-                        let cookie = Cookie::build(APP_NAME, token)
+
+                        if result.result {
+                            let cookie = Cookie::build(APP_NAME, token)
                             .path("/")
                             .http_only(true)
                             .same_site(SameSite::None) // ❗ WAJIB None agar cookie cross-site
@@ -52,9 +53,14 @@ async fn login(req: HttpRequest, request: web::Json<LoginRequest>) -> impl Respo
                             .expires(time::OffsetDateTime::now_utc() + time::Duration::days(2)) // Set expired 2 hari
                             .finish();
 
-                        return HttpResponse::Ok()
-                            .cookie(cookie)
-                            .json(serde_json::json!({ "data": result.message }));
+                            return HttpResponse::Ok()
+                                .cookie(cookie)
+                                .json(serde_json::json!({ "data": result.message }));
+                        }
+                            
+                        if !result.result {
+                            return HttpResponse::BadRequest().json(serde_json::json!({ "error": result.message }));
+                        }
                     }
                     Err(err) => {
                         println!("❌ Failed to create JWT: {}", err);
