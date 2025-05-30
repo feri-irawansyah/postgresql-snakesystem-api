@@ -14,7 +14,7 @@ CREATE TABLE users (
     last_resend_otp TIMESTAMPTZ,
     otp_generated_link VARCHAR(100),
     reset_password_key VARCHAR(100),
-    reset_password_flag INTEGER,
+    reset_password_flag BOOLEAN,
     reset_password_date TIMESTAMPTZ,
     otp_generated_link_date TIMESTAMPTZ,
     count_resend_activation INTEGER NOT NULL DEFAULT 0,

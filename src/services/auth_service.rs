@@ -4,6 +4,7 @@ use sqlx::PgPool;
 use sqlx::Row;
 
 use crate::middleware::jwt_session::validate_jwt;
+use crate::middleware::model::ChangePasswordRequest;
 use crate::middleware::model::RegisterRequest;
 use crate::middleware::model::ResetPasswordRequest;
 use crate::CONNECTION;
@@ -179,7 +180,7 @@ impl AuthService {
 
         let mut mail_data = HashMap::new();
         mail_data.insert("FirstName".to_string(), request.full_name);
-        mail_data.insert("ActivationURL".to_string(), Some(format!("{}/{}", front_url, otp_generated_link)));
+        mail_data.insert("ActivationURL".to_string(), Some(format!("{}/activation/{}", front_url, otp_generated_link)));
         mail_data.insert("CompanyName".to_string(), Some("PT. TECH SNAKE SYSTEM".to_string()));
         mail_data.insert("subject".to_string(), Some("Verifikasi Akun Anda".to_string()));
         mail_data.insert("email".to_string(), request.email);
@@ -427,6 +428,8 @@ impl AuthService {
         let mut result: ActionResult<String, String> = ActionResult::default();
 
         let connection = CONNECTION.get().expect("DB_POOL not initialized");
+        let secrets = SECRETS.get().expect("SECRETS not initialized");
+        let front_url = secrets.get("FRONT_URL").expect("secret was not found");
 
         let mut trans = match connection.begin().await {
             Ok(t) => t,
@@ -436,28 +439,45 @@ impl AuthService {
             }            
         };
 
-        let query_result = match sqlx::query(
-            r#"UPDATE users 
-                SET reset_password_key = $1,
-                reset_password_flag = $2,
-                reset_password_date = $3
-                WHERE email = $4"#
-        )
+        let query_result : String = match sqlx::query(r#"
+            UPDATE users 
+            SET reset_password_key = $1,
+            reset_password_flag = $2,
+            reset_password_date = $3
+            WHERE email = $4
+            RETURNING reset_password_key;"#)
+            .bind(GenericService::random_string(70))
+            .bind(true)
+            .bind(GenericService::get_timestamp())
             .bind(&request.email)
-            .execute(&mut *trans)
-            .await {
-                Ok(row) => row,
+            .fetch_one(&mut *trans).await {
+                Ok(row) => row.get("reset_password_key"),
                 Err(e) => {
-                    result.error = Some(format!("Failed to insert users: {}", e));
+                    // result.error = Some(format!("Failed to insert users: {}", e));
+                    result.message = "User not found".to_string();
+                    println!("Failed to update users: {}", e);
                     return result;
                 }
             };
 
-        if query_result.rows_affected() == 1 {
+        if query_result.is_empty() {
+            result.message = "User not found".to_string();
+        } else {
             result.result = true;
             result.message = "Reset password successfully".to_string();
-        } else {
-            result.message = "User not found".to_string();
+
+            let mut mail_data = HashMap::new();
+            mail_data.insert("email_upper".to_string(), request.email.clone());
+            mail_data.insert("front_url".to_string(), Some(format!("{}/reset-password/{}", front_url, query_result)));
+            mail_data.insert("company_name".to_string(), Some("PT. TECH SNAKE SYSTEM".to_string()));
+            mail_data.insert("subject".to_string(), Some("Verifikasi Akun Anda".to_string()));
+            mail_data.insert("email".to_string(), request.email);
+
+            let mail_result : ActionResult<String, String> = MailService::send(mail_data, "reset-password").await;
+            
+            if let Some(e) = mail_result.error {
+                println!("❌ Mail Error: {}", e);
+            }
         }
 
         if let Err(e) = trans.commit().await {
@@ -465,6 +485,52 @@ impl AuthService {
             return result;
         };
 
+        return result;
+    }
+
+    pub async fn change_password(request: ChangePasswordRequest) -> ActionResult<String, String> {
+        let mut result: ActionResult<String, String> = ActionResult::default();
+
+        let connection = CONNECTION.get().expect("DB_POOL not initialized");
+        let mut trans = match connection.begin().await {
+            Ok(t) => t,
+            Err(e) => {
+                result.error = Some(format!("Database error: {}", e));
+                return result;
+            }            
+        };
+
+        let enc_password = encrypt_text(request.password.unwrap_or_default());
+        println!("{}", enc_password);
+
+        let query_result = match sqlx::query(r#"
+            UPDATE users 
+            SET password = $1,
+            reset_password_date = $2
+            WHERE reset_password_key = $3 AND email = $4;"#)
+            .bind(enc_password)
+            .bind(GenericService::get_timestamp())
+            .bind(request.reset_password_key.clone())
+            .bind(&request.email)
+            .execute(&mut *trans).await {
+                Ok(row) => row,
+                Err(e) => {
+                    result.error = Some(format!("Failed to update users: {}", e));
+                    return result;
+                }
+            };
+
+        if query_result.rows_affected() == 1 {
+            result.result = true;
+            result.message = "Change password successfully".to_string();
+        } else {
+            result.message = "Reset password key not found".to_string();
+        }
+        
+        if let Err(e) = trans.commit().await {
+            result.error = Some(format!("Failed to commit transaction: {}", e));
+            return result;
+        }
         return result;
     }
 }

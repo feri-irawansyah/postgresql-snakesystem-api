@@ -3,7 +3,7 @@ use validator::Validate;
 
 use crate::{middleware::{
     jwt_session::{create_jwt, validate_jwt, Claims}, 
-    model::{ActionResult, LoginRequest, RegisterRequest}},
+    model::{ActionResult, ChangePasswordRequest, LoginRequest, RegisterRequest, ResetPasswordRequest}},
     services::{auth_service::AuthService, generic_service::GenericService
 }};
 
@@ -16,6 +16,8 @@ pub fn auth_scope() -> Scope {
         .service(check_session)
         .service(register)
         .service(activation)
+        .service(reset_password)
+        .service(change_password)
 }
 
 #[post("/login")]
@@ -172,5 +174,53 @@ async fn activation(activation_url: web::Path<String>) -> impl Responder {
         response => HttpResponse::BadRequest().json(serde_json::json!({ 
             "error": response.message
          })), // Jika gagal, HTTP 400
+    }
+}
+
+#[post("/reset-password")]
+async fn reset_password(request: web::Json<ResetPasswordRequest>) -> impl Responder {
+
+    if let Err(err) = request.validate() {
+        return HttpResponse::BadRequest().json(serde_json::json!({
+            "error": err
+        }));
+    }
+
+    let result: ActionResult<String, String> = AuthService::reset_password(request.into_inner()).await;
+
+    match result {
+        response if response.error.is_some() => {
+            HttpResponse::InternalServerError().json(serde_json::json!({
+                "error": response.error
+            }))
+        }, // Jika error, HTTP 500
+        response if response.result => HttpResponse::Ok().json(serde_json::json!({
+            "data": response.message
+        })), // Jika berhasil, HTTP 200
+        response => HttpResponse::BadRequest().json(serde_json::json!({ "error": response.message })), // Jika gagal, HTTP 400
+    }
+}
+
+#[post("/change-password")]
+async fn change_password(request: web::Json<ChangePasswordRequest>) -> impl Responder {
+
+    if let Err(err) = request.validate() {
+        return HttpResponse::BadRequest().json(serde_json::json!({
+            "error": err
+        }));
+    }
+
+    let result: ActionResult<String, String> = AuthService::change_password(request.into_inner()).await;
+
+    match result {
+        response if response.error.is_some() => {
+            HttpResponse::InternalServerError().json(serde_json::json!({
+                "error": response.error
+            }))
+        }, // Jika error, HTTP 500
+        response if response.result => HttpResponse::Ok().json(serde_json::json!({
+            "data": response.message
+        })), // Jika berhasil, HTTP 200
+        response => HttpResponse::BadRequest().json(serde_json::json!({ "error": response.message })), // Jika gagal, HTTP 400
     }
 }
