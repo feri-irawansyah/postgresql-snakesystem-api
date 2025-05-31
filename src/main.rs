@@ -1,7 +1,7 @@
 use actix_cors::Cors;
 use actix_web::{get, http, web::{self, route, ServiceConfig}, Responder};
 use docs::swagger::{health_check, Swagger};
-use handlers::{auth_handler::auth_scope, mail_handler::mail_scope};
+use handlers::{auth_handler::auth_scope, mail_handler::mail_scope, option_handler::option_scope};
 use services::generic_service::GenericService;
 use shuttle_actix_web::ShuttleActixWeb;
 use shuttle_runtime::SecretStore;
@@ -29,10 +29,13 @@ mod services {
     pub mod auth_service;
     pub mod mail_service;
     pub mod generic_service;
+    pub mod user_service;
+    pub mod option_service;
 }
 mod handlers {
     pub mod auth_handler;
     pub mod mail_handler;
+    pub mod option_handler;
 }
 mod utils {
     pub mod api_docs;
@@ -79,8 +82,8 @@ async fn main(
                 web::scope("/api/v1")
                     .wrap(cors)
                     .service(mail_scope())
-                    .service(auth_scope()),
-                    
+                    .service(option_scope())
+                    .service(auth_scope()),                    
             )
             .service(
                 SwaggerUi::new("/docs/{_:.*}")
