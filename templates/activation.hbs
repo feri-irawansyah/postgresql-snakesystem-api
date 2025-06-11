@@ -15,23 +15,26 @@
                   <tbody>
                     <tr>
                       <td style="padding-top:10px; line-height:24px;font-size:16px">
-                        <h3 style="text-align:center"><b>OPENING ACCOUNT VERIFICATION</b></h3>
+                        <h3 style="text-align:center"><b>{{title}}</b></h3>
                       </td>
                     </tr>
-                    <tr><td style="padding-top:10px;line-height:24px;font-size:16px"><h4><b>Kepada Yth Bapak/Ibu {{FirstName}},</b></h4></td></tr>
-                    <tr><td style="padding-top:10px;line-height:24px;font-size:16px;text-align:justify;">Terima kasih telah melakukan registrasi untuk pengisian pembukaan rekening online di {{CompanyName}}.</td></tr>
+                    <tr><td style="padding-top:10px;line-height:24px;font-size:16px"><h4><b>Kepada Yth Bapak/Ibu {{username}},</b></h4></td></tr>
+                    <tr><td style="padding-top:10px;line-height:24px;font-size:16px;text-align:justify;">Terima kasih telah melakukan registrasi untuk pengisian pembukaan rekening online di {{company_name}}.</td></tr>
                     <tr><td style="padding-top:10px;line-height:24px;font-size:16px;text-align:justify;">Gunakan link berikut untuk aktivasi akun registrasi pembukaan rekening online Anda:</td></tr>
                     <tr>
                       <td style="padding-top:10px; line-height:24px; font-size:16px; text-align: center;">
-                        <a href="{{ActivationURL}}" style="text-center">
-                          <button style="width:150px;height:30px;background-color:#EC1E23;color:white;border:none;border-radius:10px;text-align:center">
+                        <a href="{{activation_url}}" style="text-center">
+                          <button style="width:150px;height:30px;background-color:#EC1E23;color:white;border:none;border-radius:10px;text-align:center;cursor:pointer">
                             <strong>Link Aktivasi Akun</strong>
                           </button>
                         </a>
                       </td>
                     </tr>
-                    <tr><td style="padding-top:10px;line-height:24px;font-size:16px;text-align:justify;">Terima kasih atas kepercayaan Anda telah memilih {{CompanyName}} sebagai partner investasi.</td></tr>
-                    <tr><td style="padding-top:10px;line-height:24px;font-size:16px;text-align:left;">Regards,<br/>{{CompanyName}},<br/></td></tr>
+                    <tr>
+                      <td style="padding:2rem 0;line-height:24px;font-size:3rem;text-align:justify;font-weight:bold;letter-spacing:1.5rem"><center>{{otp_code}}</center></td>
+                    </tr>
+                    <tr><td style="padding-top:10px;line-height:24px;font-size:16px;text-align:justify;">Terima kasih atas kepercayaan Anda telah memilih {{company_name}} sebagai partner investasi.</td></tr>
+                    <tr><td style="padding-top:10px;line-height:24px;font-size:16px;text-align:left;">Regards,<br/>{{company_name}},<br/></td></tr>
                   </tbody>
                 </table>
               </td>
@@ -47,8 +50,8 @@
                           <tbody>
                             <tr>
                               <td style="font-size:16px;margin:0;padding:0;list-style:none;font-weight:500;font-family:Oxygen-Regular;color:black;text-align:justify;">
-                                {{CompanyName}} is Securities Company Member of the Indonesia Stock Exchange, licensed, registered and supervised by the Financial Service Authority.<br/><br/>
-                                © 2021, {{CompanyName}}
+                                {{company_name}} is an Information Technology company that is ready to serve requests for modern software.<br/><br/>
+                                © 2025, {{company_name}}
                               </td>
                             </tr>
                           </tbody>

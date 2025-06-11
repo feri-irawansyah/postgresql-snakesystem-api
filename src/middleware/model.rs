@@ -188,3 +188,19 @@ pub struct MyRow {
     pub name: String,
     // tambah field lain sesuai kebutuhan
 }
+
+// Region Email
+#[derive(Debug, Deserialize, Serialize, ToSchema, Clone, Validate)]
+pub struct SendEmailRequest {
+    #[validate(custom(function = "required"))]
+    pub company_name: String,
+    #[validate(custom(function = "required"))]
+    pub email: String,
+    #[validate(custom(function = "required"))]
+    pub front_url: String,
+    #[validate(custom(function = "required"))]
+    pub subject: String,
+    #[validate(custom(function = "required"))]
+    pub url_token: String,
+    pub otp_code: i32,
+}

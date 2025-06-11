@@ -179,11 +179,12 @@ impl AuthService {
         }
 
         let mut mail_data = HashMap::new();
-        mail_data.insert("FirstName".to_string(), request.full_name);
-        mail_data.insert("ActivationURL".to_string(), Some(format!("{}/activation/{}", front_url, otp_generated_link)));
-        mail_data.insert("CompanyName".to_string(), Some("PT. TECH SNAKE SYSTEM".to_string()));
+        mail_data.insert("username".to_string(), request.full_name);
+        mail_data.insert("activation_url".to_string(), Some(format!("{}/activation/{}", front_url, otp_generated_link)));
+        mail_data.insert("company_name".to_string(), Some("PT. TECH SNAKE SYSTEM".to_string()));
         mail_data.insert("subject".to_string(), Some("Verifikasi Akun Anda".to_string()));
         mail_data.insert("email".to_string(), request.email);
+        mail_data.insert("title".to_string(), Some("CUSTOMER ONBOARDING ACTIVATION".to_string()));
 
         let mail_result : ActionResult<String, String> = MailService::send(mail_data, "activation").await;
         
@@ -467,11 +468,11 @@ impl AuthService {
             result.message = "Reset password successfully".to_string();
 
             let mut mail_data = HashMap::new();
-            mail_data.insert("email_upper".to_string(), request.email.clone());
             mail_data.insert("front_url".to_string(), Some(format!("{}/reset-password/{}", front_url, query_result)));
             mail_data.insert("company_name".to_string(), Some("PT. TECH SNAKE SYSTEM".to_string()));
             mail_data.insert("subject".to_string(), Some("Verifikasi Akun Anda".to_string()));
             mail_data.insert("email".to_string(), request.email);
+            mail_data.insert("title".to_string(), Some(String::from("RESET PASSWORD CUSTOMER ONBOARDING")));
 
             let mail_result : ActionResult<String, String> = MailService::send(mail_data, "reset-password").await;
             
