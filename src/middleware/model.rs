@@ -202,5 +202,7 @@ pub struct SendEmailRequest {
     pub subject: String,
     #[validate(custom(function = "required"))]
     pub url_token: String,
+    #[validate(custom(function = "required"))]
+    pub title: String,
     pub otp_code: i32,
 }
