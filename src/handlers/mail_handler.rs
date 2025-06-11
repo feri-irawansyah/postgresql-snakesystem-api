@@ -52,8 +52,6 @@ pub async fn send_email(email_type: web::Path<String>, request: web::Json<SendEm
     mail_data.insert("title".to_string(), Some(request.title.clone()));
     mail_data.insert("otp_code".to_string(), Some(request.otp_code.to_string()));
 
-    println!("Email Data: {:#?}", mail_data);
-
     let mail_result : ActionResult<String, String> = MailService::send(mail_data, &email_type).await;
 
     if mail_result.result {
