@@ -44,13 +44,15 @@ pub async fn send_email(email_type: web::Path<String>, request: web::Json<SendEm
     }
 
     let mut mail_data = HashMap::new();
-    mail_data.insert("email_upper".to_string(), Some(request.email.clone()));
+    mail_data.insert("email".to_string(), Some(request.email.clone()));
     mail_data.insert("front_url".to_string(), format!("{}/{}/{}", request.front_url, email_type, request.url_token).into());
     mail_data.insert("company_name".to_string(), Some(request.company_name.clone()));
     mail_data.insert("subject".to_string(), Some(request.subject.clone()));
-    mail_data.insert("email".to_string(), Some(request.email.clone()));
+    mail_data.insert("username".to_string(), Some(request.username.clone()));
     mail_data.insert("title".to_string(), Some(request.title.clone()));
     mail_data.insert("otp_code".to_string(), Some(request.otp_code.to_string()));
+
+    println!("Email Data: {:#?}", mail_data);
 
     let mail_result : ActionResult<String, String> = MailService::send(mail_data, &email_type).await;
 
