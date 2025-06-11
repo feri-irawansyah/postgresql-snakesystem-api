@@ -50,7 +50,7 @@ pub async fn send_email(email_type: web::Path<String>, request: web::Json<SendEm
     mail_data.insert("subject".to_string(), Some(request.subject.clone()));
     mail_data.insert("email".to_string(), Some(request.email.clone()));
     mail_data.insert("title".to_string(), Some(request.title.clone()));
-    mail_data.insert("otp_code".to_string(), Some(request.otp_code.clone()));
+    mail_data.insert("otp_code".to_string(), Some(request.otp_code.to_string()));
 
     let mail_result : ActionResult<String, String> = MailService::send(mail_data, &email_type).await;
 
