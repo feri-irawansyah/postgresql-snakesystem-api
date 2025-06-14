@@ -19,7 +19,7 @@ pub async fn preview_template(query: web::Query<HashMap<String, String>>) -> imp
     // Dummy request
     let mut request = HashMap::new();
     request.insert("username".to_string(), "Budi".to_string());
-    request.insert("activation_url".to_string(), "https://example.com/activate/abc123".to_string());
+    request.insert("front_url".to_string(), "https://example.com/activate/abc123".to_string());
     request.insert("company_name".to_string(), "PT. SNAKESYSTEM".to_string());
     request.insert("subject".to_string(), "Verifikasi Akun Anda".to_string());
     request.insert("email".to_string(), "budi@example.com".to_string());

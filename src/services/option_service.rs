@@ -37,7 +37,14 @@ impl OptionService {
         let col_str = cols.join(", ");
 
         let rows = if mode == "autocomplete" && keyword.is_some() {
-            let sql = format!("SELECT {} FROM {} WHERE {} ILIKE $1 LIMIT 20", col_str, table, search_col);
+            let sql = format!(
+                "SELECT {} FROM {} WHERE {} ILIKE $1 OR {}::TEXT ILIKE $1 LIMIT 20",
+                col_str,
+                table,
+                search_col,
+                cols[0] // asumsi cols[0] = ID column seperti country_id
+            );
+
             sqlx::query(&sql)
                 .bind(format!("%{}%", keyword.unwrap()))
                 .fetch_all(connection)
@@ -71,7 +78,7 @@ impl OptionService {
         result
     }
 
-    fn pg_value_to_json(row: &sqlx::postgres::PgRow, col: &str) -> Value {
+    pub fn pg_value_to_json(row: &sqlx::postgres::PgRow, col: &str) -> Value {
         let type_name = row.column(col).type_info().to_string();
 
         match type_name.as_str() {
@@ -121,6 +128,18 @@ impl OptionService {
                 val.ok().map(Value::String).unwrap_or(Value::Null)
             }
         }
+    }
+
+    pub fn row_to_json(row: &sqlx::postgres::PgRow) -> serde_json::Map<String, Value> {
+        let mut map = serde_json::Map::new();
+
+        for column in row.columns() {
+            let col_name = column.name();
+            let value = Self::pg_value_to_json(row, col_name);
+            map.insert(col_name.to_string(), value);
+        }
+
+        map
     }
 
 }

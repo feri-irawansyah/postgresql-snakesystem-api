@@ -27,6 +27,7 @@ impl AuthService {
             SELECT 
                 B.autonid AS user_id, 
                 B.fullname,
+                B.stage,
                 A.email, 
                 A.disable_login, 
                 A.last_login, 
@@ -51,11 +52,12 @@ impl AuthService {
                 result.result = true;
                 result.data = Some(Claims {
                     usernid: row.try_get::<i32, _>("user_id").unwrap_or(0),
+                    stage: row.try_get::<i32, _>("stage").unwrap_or(0),
                     fullname: row.try_get::<String, _>("fullname").unwrap_or_default(),
                     email: row.try_get::<String, _>("email").unwrap_or_default(),
                     disabled_login: row.try_get::<bool, _>("disable_login").unwrap_or(false),
                     picture: row.try_get::<Option<String>, _>("picture").unwrap_or_default(),
-                    register_date: row.try_get("register_date").unwrap_or_else(|_| GenericService::get_timestamp()),
+                    register_date: row.try_get::<chrono::DateTime<chrono::Utc>, _>("register_date").unwrap_or_else(|_| chrono::Utc::now()),
                     result: true,
                     expired_token: 0,
                     expired_date: "".to_string(),
@@ -180,7 +182,7 @@ impl AuthService {
 
         let mut mail_data = HashMap::new();
         mail_data.insert("username".to_string(), request.full_name);
-        mail_data.insert("activation_url".to_string(), Some(format!("{}/activation/{}", front_url, otp_generated_link)));
+        mail_data.insert("front_url".to_string(), Some(format!("{}/activation/{}", front_url, otp_generated_link)));
         mail_data.insert("company_name".to_string(), Some("PT. TECH SNAKE SYSTEM".to_string()));
         mail_data.insert("subject".to_string(), Some("Verifikasi Akun Anda".to_string()));
         mail_data.insert("email".to_string(), request.email);
@@ -224,7 +226,7 @@ impl AuthService {
             
         };
 
-        let (web_cif_id, activate_time, count_resend_activation): (Option<i32>, Option<chrono::NaiveDateTime>, Option<i32>) = match query_result {
+        let (web_cif_id, activate_time, count_resend_activation): (Option<i32>, Option<chrono::DateTime<chrono::Utc>>, Option<i32>) = match query_result {
             Some(row) => (row.get("web_cif_id"), row.get("activate_time"), row.get("count_resend_activation")),
             None => {
                 result.message = "Invalid activation link".into();

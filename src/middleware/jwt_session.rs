@@ -11,12 +11,13 @@ use crate::SECRETS;
 pub struct Claims {
     pub result: bool,
     pub usernid: i32,
+    pub stage: i32,
     pub email: String,
     pub fullname: String,
     pub disabled_login: bool,
     pub expired_token: i64,
     pub expired_date: String,
-    pub register_date: NaiveDateTime,
+    pub register_date: chrono::DateTime<chrono::Utc>,
     pub exp: usize,
     pub picture: Option<String>,
     pub comp_name: Option<String>,
@@ -32,6 +33,7 @@ impl Claims {
 
         Self {
             result: true,
+            stage: user.stage,
             email: user.email,
             fullname: user.fullname,
             expired_token: expired_token.timestamp(),

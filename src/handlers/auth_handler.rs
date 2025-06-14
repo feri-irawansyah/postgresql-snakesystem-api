@@ -18,6 +18,7 @@ pub fn auth_scope() -> Scope {
         .service(activation)
         .service(reset_password)
         .service(change_password)
+        .service(logout)
 }
 
 #[post("/login")]
@@ -223,4 +224,59 @@ async fn change_password(request: web::Json<ChangePasswordRequest>) -> impl Resp
         })), // Jika berhasil, HTTP 200
         response => HttpResponse::BadRequest().json(serde_json::json!({ "error": response.message })), // Jika gagal, HTTP 400
     }
+}
+
+#[post("/logout")]
+async fn logout(req: HttpRequest) -> impl Responder {
+
+    let mut result: ActionResult<Claims, _> = ActionResult::default();
+
+    // Ambil cookie "token"
+    let token_cookie = req.cookie(APP_NAME);
+
+    println!("token_cookie: {:#?}", token_cookie);
+
+    // Cek apakah token ada di cookie
+    let token = match token_cookie {
+        Some(cookie) => cookie.value().to_string(),
+        None => {
+            result.error = Some("Token not found".to_string());
+            return HttpResponse::Unauthorized().json(result);
+        }
+    };
+
+    match validate_jwt(&token) {
+        Ok(claims) => {
+            result = AuthService::check_session(claims.clone(), token.clone(), token.clone(), true, false, false, APP_NAME).await;
+
+            match result {
+                response if response.error.is_some() => {
+                    HttpResponse::InternalServerError().json(serde_json::json!({
+                        "error": response.error
+                    }))
+                },
+                response if response.result => {
+                    
+                    let cookie = Cookie::build(APP_NAME, "")
+                    .path("/")
+                    .http_only(true)
+                    .same_site(SameSite::None) // ❗ WAJIB None agar cookie cross-site
+                    .secure(true)     
+                    .expires(time::OffsetDateTime::now_utc() + time::Duration::days(2)) // Set expired 2 hari
+                    .finish();
+
+                    return HttpResponse::Ok()
+                        .cookie(cookie)
+                        .json(serde_json::json!({ "data": response.message }));
+                    
+                },
+                response => HttpResponse::BadRequest().json(serde_json::json!({ "error": response.message })), // Jika gagal login, HTTP 400
+            }
+        },
+        Err(err) => {
+            result.error = Some(err.to_string());
+            HttpResponse::Unauthorized().json(serde_json::json!({ "error": result.error }))
+        },
+    }
+    
 }
