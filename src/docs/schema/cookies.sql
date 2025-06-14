@@ -8,3 +8,4 @@ CREATE TABLE cookies (
     app_name VARCHAR(30),
     PRIMARY KEY (user_nid)
 );
+ 
