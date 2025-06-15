@@ -15,6 +15,7 @@ impl UserService {
             SELECT 
                 B.autonid AS user_id, 
                 B.fullname,
+                B.stage,
                 B.client_id,
                 B.cif_id,
                 B.email, 

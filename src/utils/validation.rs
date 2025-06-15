@@ -68,14 +68,15 @@ pub mod validator {
     }
 
     pub fn valid_phone_number(value: &str) -> Result<(), ValidationError> {
-        let phone_regex = Regex::new(r"^\d{10,15}$")
+        let phone_regex = Regex::new(r"^\+62\d{9,13}$")
             .map_err(|_| ValidationError::new("invalid_regex"))?;
 
         if !phone_regex.is_match(value) {
             let mut error = ValidationError::new("invalid_phone");
-            error.message = Some("Valus has number from 10-15 length".into());
+            error.message = Some("Value must start with +62 and contain 9-13 digits after it".into());
             return Err(error);
         }
+
         Ok(())
     }
 

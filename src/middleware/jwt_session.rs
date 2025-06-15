@@ -1,6 +1,6 @@
 use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, Validation};
 use serde::{Deserialize, Serialize};
-use chrono::{Duration, NaiveDateTime, Utc};
+use chrono::{Duration, Utc};
 use utoipa::ToSchema;
 
 use crate::SECRETS;
@@ -11,7 +11,6 @@ use crate::SECRETS;
 pub struct Claims {
     pub result: bool,
     pub usernid: i32,
-    pub stage: i32,
     pub email: String,
     pub fullname: String,
     pub disabled_login: bool,
@@ -33,7 +32,6 @@ impl Claims {
 
         Self {
             result: true,
-            stage: user.stage,
             email: user.email,
             fullname: user.fullname,
             expired_token: expired_token.timestamp(),

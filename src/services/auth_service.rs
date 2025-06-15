@@ -27,7 +27,6 @@ impl AuthService {
             SELECT 
                 B.autonid AS user_id, 
                 B.fullname,
-                B.stage,
                 A.email, 
                 A.disable_login, 
                 A.last_login, 
@@ -45,14 +44,13 @@ impl AuthService {
         match query_result {
             Ok(row) => {
                 if row.get("disable_login") {
-                    result.error = Some("Login disabled".to_string());
+                    result.error = Some("Login disabled, please check email to activation".to_string());
                     return result;
                 }
 
                 result.result = true;
                 result.data = Some(Claims {
                     usernid: row.try_get::<i32, _>("user_id").unwrap_or(0),
-                    stage: row.try_get::<i32, _>("stage").unwrap_or(0),
                     fullname: row.try_get::<String, _>("fullname").unwrap_or_default(),
                     email: row.try_get::<String, _>("email").unwrap_or_default(),
                     disabled_login: row.try_get::<bool, _>("disable_login").unwrap_or(false),
@@ -278,7 +276,7 @@ impl AuthService {
         };
 
         if exist {
-            println!("Check Session");
+            // println!("Check Session");
             let row_count: i64 = match sqlx::query(r#"SELECT COUNT(*) as count FROM cookies WHERE user_nid = $1 AND token_cookie = $2"#)
                 .bind(session.usernid)
                 .bind(&active_token)
@@ -297,7 +295,7 @@ impl AuthService {
             }
 
             if update {
-                println!("Update Session 1");
+                // println!("Update Session 1");
                 if let Err(e) = sqlx::query(r#"UPDATE cookies SET last_update = $1 WHERE user_nid = $2 AND token_cookie = $3"#)
                     .bind(GenericService::get_timestamp())
                     .bind(session.usernid)
@@ -311,7 +309,7 @@ impl AuthService {
             }
             result.result = true;
         } else if delete {
-            println!("Delete Session");
+            // println!("Delete Session");
             if let Err(e) = sqlx::query(r#"DELETE FROM cookies WHERE user_nid = $1 AND token_cookie = $2"#)
                 .bind(session.usernid)
                 .bind(&active_token)
@@ -324,7 +322,7 @@ impl AuthService {
         } else {
             let mut user_session: Claims = session.clone();
             if !cookies.is_empty() {
-                println!("Update Session 2: {}", cookies);
+                // println!("Update Session 2: {}", cookies);
                 match  sqlx::query(r#"UPDATE cookies SET token_cookie = $1, last_update = $3 WHERE user_nid = $2"#)
                     .bind(&active_token)
                     .bind(session.usernid)
@@ -346,7 +344,7 @@ impl AuthService {
                         }
                     };
             } else {
-                println!("Check Session 2");
+                // println!("Check Session 2");
                 let row_option = match sqlx::query(r#"SELECT token_cookie, last_update FROM cookies WHERE user_nid = $1"#)
                     .bind(session.usernid)
                     // .bind(&active_token)
@@ -360,7 +358,7 @@ impl AuthService {
                     };
 
                 if let Some(row) = row_option {
-                    println!("Check Session 3");
+                    // println!("Check Session 3");
                     let last_update: Option<chrono::DateTime<chrono::Utc>> = row.get("last_update");
                     let user_token: Option<String> = row.get("token_cookie");
                     if let Ok(decode_session) = validate_jwt(&user_token.unwrap_or_default()) {
@@ -368,7 +366,7 @@ impl AuthService {
                         result.data = Some(user_session);
                     }
 
-                    println!("Lastupdate: {}, now: {}", last_update.unwrap_or_default().to_string(), GenericService::get_timestamp().to_string());
+                    // println!("Lastupdate: {}, now: {}", last_update.unwrap_or_default().to_string(), GenericService::get_timestamp().to_string());
                     let expired_date: chrono::NaiveDateTime = last_update.unwrap_or_default().naive_utc();
                     if expired_date > GenericService::get_timestamp() {
                         result.message = format!(
@@ -383,7 +381,7 @@ impl AuthService {
                         // nanti ada buat multiple session sama nendang
                         return result;
                     } else {
-                        println!("Update cookies 3");
+                        // println!("Update cookies 3");
                         if let Err(e) = sqlx::query(r#"UPDATE cookies SET last_update = $1, token_cookie = $3 WHERE user_nid = $2"#)
                             .bind(GenericService::get_timestamp())
                             .bind(session.usernid)
@@ -397,7 +395,7 @@ impl AuthService {
                         result.message = "Session updated successfully".to_string();
                     }
                 } else {
-                    println!("Insert cookies");
+                    // println!("Insert cookies");
                     if let Err(e) = sqlx::query(r#"INSERT INTO cookies (user_nid, token_cookie, app_computer_name, app_ip_address, last_update, app_name) 
                                 VALUES ($1, $2, $3, $4, $5, $6)"#)
                         .bind(session.usernid)
