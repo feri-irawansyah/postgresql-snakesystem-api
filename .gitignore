@@ -2,4 +2,4 @@
 /target
 .shuttle*
 Secrets*.toml
-/docs/schema/
+/schema/*
