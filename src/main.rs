@@ -10,7 +10,7 @@ use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 use once_cell::sync::OnceCell;
 
-use crate::handlers::user_handler::user_scope;
+use crate::handlers::{data_handler::data_scope, library_handler::library_scope, user_handler::user_scope};
 
 pub static CONNECTION: OnceCell<PgPool> = OnceCell::new();
 pub static SECRETS: OnceCell<SecretStore> = OnceCell::new();
@@ -33,12 +33,16 @@ mod services {
     pub mod generic_service;
     pub mod user_service;
     pub mod option_service;
+    pub mod library_service;
+    pub mod data_service;
 }
 mod handlers {
     pub mod auth_handler;
     pub mod mail_handler;
     pub mod option_handler;
     pub mod user_handler;
+    pub mod library_handler;
+    pub mod data_handler;
 }
 mod utils {
     pub mod api_docs;
@@ -87,6 +91,8 @@ async fn main(
                     .service(mail_scope())
                     .service(option_scope())
                     .service(auth_scope())
+                    .service(library_scope())
+                    .service(data_scope())
                     .service(user_scope()),                   
             )
             .service(

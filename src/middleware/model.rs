@@ -135,16 +135,35 @@ pub struct NewNoteRequest {
     pub title: String,
     pub slug: Option<String>,
     #[validate(custom(function = "required"))]
-    pub content_md: String,
+    pub content: String,
+    #[validate(custom(function = "required"))]
+    pub description: String,
+    pub hashtag: Vec<String>,
+}
+
+#[derive(Debug, Deserialize, Serialize, ToSchema, Clone, Validate)]
+pub struct UpdateNoteRequest {
+    #[validate(custom(function = "required_int"))]
+    pub notes_id: i32,
+    #[validate(custom(function = "required"))]
+    pub category: String,
+    #[validate(custom(function = "required"))]
+    pub title: String,
+    pub slug: Option<String>,
+    #[validate(custom(function = "required"))]
+    pub content: String,
+    #[validate(custom(function = "required"))]
+    pub description: String,
+    pub hashtag: Vec<String>,
 }
 
 #[derive(Debug, Deserialize, Serialize, ToSchema, Clone)]
 pub struct Notes {
-    pub note_id: i32,
+    pub notes_id: i32,
     pub category: String,
     pub title: String,
     pub slug: String,
-    pub content_md: String,
+    pub content: String,
     pub ip_address: String,
     #[serde(serialize_with = "serialize_datetime")]
     pub last_update: chrono::DateTime<Utc>,
@@ -177,7 +196,7 @@ pub struct QueryClass {
 
 #[derive(Debug, Serialize, ToSchema)]
 pub struct ResultList {
-    pub totalNotFiltered: i32,
+    pub total_not_filtered: i32,
     pub total: i32,
     pub rows: Vec<serde_json::Value>, // Pastikan ini bisa dikonversi ke JSON
 }

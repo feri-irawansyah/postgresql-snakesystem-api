@@ -1,6 +1,6 @@
 use sqlx::PgPool;
 
-use crate::{middleware::{jwt_session::Claims, model::ActionResult}, services::option_service::OptionService, CONNECTION};
+use crate::{middleware::{jwt_session::Claims, model::ActionResult}, services::{data_service::DataService}, CONNECTION};
 
 pub struct UserService;
 
@@ -124,7 +124,7 @@ impl UserService {
             Ok(row) => {
 
                 result.result = true;
-                let json_obj = OptionService::row_to_json(&row);
+                let json_obj = DataService::row_to_json(&row);
                 result.data = Some(json_obj);
             }
             Err(e) => {

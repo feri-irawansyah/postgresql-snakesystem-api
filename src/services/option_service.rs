@@ -1,7 +1,7 @@
-use serde_json::{Number, Value};
+use serde_json::Value;
 use sqlx::Row;
-use sqlx::Column;
 
+use crate::services::data_service::DataService;
 use crate::{middleware::model::ActionResult, CONNECTION};
 
 pub struct OptionService;
@@ -68,7 +68,7 @@ impl OptionService {
                 let json: Vec<_> = data.into_iter().map(|row| {
                     let mut map: serde_json::Map<String, Value> = serde_json::Map::new();
                     for col in &cols {
-                        let value = Self::pg_value_to_json(&row, col);
+                        let value = DataService::pg_value_to_json(&row, col);
                         map.insert(col.clone(), value);
                     }
                     Value::Object(map)
@@ -129,7 +129,7 @@ impl OptionService {
                 let json: Vec<_> = data.into_iter().map(|row| {
                     let mut map: serde_json::Map<String, Value> = serde_json::Map::new();
                     for col in &["id", "province", "city"] {
-                        let value = Self::pg_value_to_json(&row, col);
+                        let value = DataService::pg_value_to_json(&row, col);
                         map.insert(col.to_string(), value);
                     }
                     Value::Object(map)
@@ -163,70 +163,6 @@ impl OptionService {
         result.data = Some(question_npwp.clone());
 
         return result;
-    }
-
-    pub fn pg_value_to_json(row: &sqlx::postgres::PgRow, col: &str) -> Value {
-        let type_name = row.column(col).type_info().to_string();
-
-        match type_name.as_str() {
-            "INT2" => {
-                let val: Result<i16, _> = row.try_get(col);
-                val.ok()
-                    .map(|v| Value::Number(v.into()))
-                    .unwrap_or(Value::Null)
-            }
-            "INT4" => {
-                let val: Result<i32, _> = row.try_get(col);
-                val.ok()
-                    .map(|v| Value::Number(v.into()))
-                    .unwrap_or(Value::Null)
-            }
-            "INT8" => {
-                let val: Result<i64, _> = row.try_get(col);
-                val.ok()
-                    .map(|v| Value::Number(v.into()))
-                    .unwrap_or(Value::Null)
-            }
-            "FLOAT4" => {
-                let val: Result<f32, _> = row.try_get(col);
-                val.ok()
-                    .and_then(|v| Number::from_f64(v as f64))
-                    .map(Value::Number)
-                    .unwrap_or(Value::Null)
-            }
-            "FLOAT8" => {
-                let val: Result<f64, _> = row.try_get(col);
-                val.ok()
-                    .and_then(Number::from_f64)
-                    .map(Value::Number)
-                    .unwrap_or(Value::Null)
-            }
-            "BOOL" => {
-                let val: Result<bool, _> = row.try_get(col);
-                val.ok().map(Value::Bool).unwrap_or(Value::Null)
-            }
-            "TEXT" | "VARCHAR" | "UUID" | "TIMESTAMP" | "DATE" => {
-                let val: Result<String, _> = row.try_get(col);
-                val.ok().map(Value::String).unwrap_or(Value::Null)
-            }
-            _ => {
-                // fallback ke string kalau tidak dikenali
-                let val: Result<String, _> = row.try_get(col);
-                val.ok().map(Value::String).unwrap_or(Value::Null)
-            }
-        }
-    }
-
-    pub fn row_to_json(row: &sqlx::postgres::PgRow) -> serde_json::Map<String, Value> {
-        let mut map = serde_json::Map::new();
-
-        for column in row.columns() {
-            let col_name = column.name();
-            let value = Self::pg_value_to_json(row, col_name);
-            map.insert(col_name.to_string(), value);
-        }
-
-        map
     }
 
 }
