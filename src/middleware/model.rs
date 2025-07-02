@@ -157,6 +157,34 @@ pub struct UpdateNoteRequest {
     pub hashtag: Vec<String>,
 }
 
+#[derive(Debug, Deserialize, Serialize, ToSchema, Clone, Validate)]
+pub struct NewSkillRequest {
+    #[validate(custom(function = "required"))]
+    pub title: String,
+    #[validate(custom(function = "required"))]
+    pub url_docs: String,
+    pub image_src: String,
+    #[validate(custom(function = "required"))]
+    pub description: String,
+    pub progress: i32,
+    pub star: i32,
+}
+
+#[derive(Debug, Deserialize, Serialize, ToSchema, Clone, Validate)]
+pub struct UpdateSkillRequest {
+    #[validate(custom(function = "required_int"))]
+    pub skill_id: i32,
+    #[validate(custom(function = "required"))]
+    pub title: String,
+    #[validate(custom(function = "required"))]
+    pub url_docs: String,
+    pub image_src: String,
+    #[validate(custom(function = "required"))]
+    pub description: String,
+    pub progress: i32,
+    pub star: i32,
+}
+
 #[derive(Debug, Deserialize, Serialize, ToSchema, Clone)]
 pub struct Notes {
     pub notes_id: i32,
@@ -164,7 +192,21 @@ pub struct Notes {
     pub title: String,
     pub slug: String,
     pub content: String,
-    pub ip_address: String,
+    pub description: String,
+    #[serde(serialize_with = "serialize_datetime")]
+    pub last_update: chrono::DateTime<Utc>,
+    pub hashtag: Vec<String>,
+}
+
+#[derive(Debug, Deserialize, Serialize, ToSchema, Clone)]
+pub struct Skill {
+    pub skill_id: i32,
+    pub title: String,
+    pub description: String,
+    pub url_docs: String,
+    pub image_src: String,
+    pub progress: i32,
+    pub star: i32,
     #[serde(serialize_with = "serialize_datetime")]
     pub last_update: chrono::DateTime<Utc>,
 }
