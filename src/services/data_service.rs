@@ -22,7 +22,9 @@ impl DataService {
         let query = Self::get_query_table(allparams.clone(), false);
 
         if !allparams.tablename.is_empty() {
-            let rows = sqlx::query(query.query_total_all.clone().as_str()).fetch_optional(connection).await?;
+            let rows = sqlx::query(query.query_total_all.clone().as_str())
+                    .persistent(false)
+                    .fetch_optional(connection).await?;
             if let Some(r) = rows {
                 result.total_not_filtered = r.try_get::<i32, _>(0).unwrap_or(0);
             }
@@ -31,7 +33,9 @@ impl DataService {
         // Hitung total data yang sesuai filter
         if let Some(filter) = &allparams.filter {
             if filter != "{filter:undefined}" {
-                let row = sqlx::query(query.query_total_with_filter.clone().as_str()).fetch_optional(connection).await?;
+                let row = sqlx::query(query.query_total_with_filter.clone().as_str())
+                .persistent(false)
+                .fetch_optional(connection).await?;
                 // let row: Option<Row> = client.query(query.query_total_with_filter.clone(), &[]).await?.into_row().await?;
                 if let Some(r) = row {
                     result.total = r.try_get::<i32, _>(0).unwrap_or(0);
@@ -41,7 +45,9 @@ impl DataService {
             result.total = result.total_not_filtered;
         }
 
-        let rows: Vec<sqlx::postgres::PgRow> = sqlx::query(query.query.clone().as_str()).fetch_all(connection).await?;
+        let rows: Vec<sqlx::postgres::PgRow> = sqlx::query(query.query.clone().as_str())
+        .persistent(false)
+        .fetch_all(connection).await?;
 
         let json_rows: Vec<serde_json::Value> = rows
             .iter()
