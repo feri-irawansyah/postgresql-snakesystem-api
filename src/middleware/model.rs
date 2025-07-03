@@ -283,8 +283,8 @@ pub struct QueryClass {
 
 #[derive(Debug, Serialize, ToSchema)]
 pub struct ResultList {
-    pub total_not_filtered: i32,
-    pub total: i32,
+    pub total_not_filtered: i64,
+    pub total: i64,
     pub rows: Vec<serde_json::Value>, // Pastikan ini bisa dikonversi ke JSON
 }
 

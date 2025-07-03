@@ -60,7 +60,7 @@ async fn main(
     let db_url = secrets.get("DATABASE_URL").expect("DB URL not found");
 
     let pool = match PgPoolOptions::new()
-        .max_connections(3)
+        .max_connections(10)
         .idle_timeout(std::time::Duration::from_secs(30))
         .max_lifetime(std::time::Duration::from_secs(60))
         .acquire_slow_threshold(std::time::Duration::from_secs(5))

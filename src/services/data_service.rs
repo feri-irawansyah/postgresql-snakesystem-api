@@ -26,7 +26,7 @@ impl DataService {
                     .persistent(false)
                     .fetch_optional(connection).await?;
             if let Some(r) = rows {
-                result.total_not_filtered = r.try_get::<i32, _>(0).unwrap_or(0);
+                result.total_not_filtered = r.try_get::<i64, _>(0).unwrap_or(0);
             }
         }
 
@@ -38,7 +38,7 @@ impl DataService {
                 .fetch_optional(connection).await?;
                 // let row: Option<Row> = client.query(query.query_total_with_filter.clone(), &[]).await?.into_row().await?;
                 if let Some(r) = row {
-                    result.total = r.try_get::<i32, _>(0).unwrap_or(0);
+                    result.total = r.try_get::<i64, _>(0).unwrap_or(0);
                 }
             }
         } else {
