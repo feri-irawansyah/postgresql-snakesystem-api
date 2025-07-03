@@ -5,8 +5,12 @@ use crate::{middleware::model::{ResultList, TableDataParams}, services::data_ser
 
 pub fn data_scope() -> Scope {
     
-    web::scope("/data")
-        .service(get_table)
+    web::scope("/data").configure(config)
+}
+
+pub fn config(cfg: &mut web::ServiceConfig) {
+    cfg
+        .service(get_table);
 }
 
 #[get("/table")]

@@ -6,8 +6,11 @@ const APP_NAME: &str = "snakesystem-api";
 
 pub fn user_scope() -> Scope {
     
-    web::scope("/user")
-        .service(get_user)
+    web::scope("/user").configure(config)
+}
+
+pub fn config(cfg: &mut web::ServiceConfig) {
+    cfg.service(get_user);
 }
 
 #[get("/data")]

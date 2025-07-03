@@ -185,6 +185,32 @@ pub struct UpdateSkillRequest {
     pub star: i32,
 }
 
+#[derive(Debug, Deserialize, Serialize, ToSchema, Clone, Validate)]
+pub struct NewPortfolioRequest {
+    #[validate(custom(function = "required"))]
+    pub title: String,
+    #[validate(custom(function = "required"))]
+    pub url_docs: String,
+    pub image_src: String,
+    #[validate(custom(function = "required"))]
+    pub description: String,
+    pub tech: Vec<i32>,
+}
+
+#[derive(Debug, Deserialize, Serialize, ToSchema, Clone, Validate)]
+pub struct UpdatePortfolioRequest {
+    #[validate(custom(function = "required_int"))]
+    pub portfolio_id: i32,
+    #[validate(custom(function = "required"))]
+    pub title: String,
+    #[validate(custom(function = "required"))]
+    pub url_docs: String,
+    pub image_src: String,
+    #[validate(custom(function = "required"))]
+    pub description: String,
+    pub tech: Vec<i32>,
+}
+
 #[derive(Debug, Deserialize, Serialize, ToSchema, Clone)]
 pub struct Notes {
     pub notes_id: i32,
@@ -209,6 +235,25 @@ pub struct Skill {
     pub star: i32,
     #[serde(serialize_with = "serialize_datetime")]
     pub last_update: chrono::DateTime<Utc>,
+}
+
+#[derive(Debug, Deserialize, Serialize, ToSchema, Clone)]
+pub struct Portfolio {
+    pub portfolio_id: i32,
+    pub title: String,
+    pub description: String,
+    pub url_docs: String,
+    pub image_src: String,
+    pub tech: Vec<SkillSummary>,
+    #[serde(serialize_with = "serialize_datetime")]
+    pub last_update: chrono::DateTime<Utc>,
+}
+
+#[derive(Debug, Deserialize, Serialize, ToSchema, Clone)]
+pub struct SkillSummary {
+    pub title: String,
+    pub image_src: String,
+    pub url_docs: String,
 }
 
 #[derive(Debug, Clone, Deserialize, IntoParams)]

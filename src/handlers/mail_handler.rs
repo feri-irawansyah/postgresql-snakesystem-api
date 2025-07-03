@@ -6,10 +6,13 @@ use validator::Validate;
 use crate::{middleware::model::{ActionResult, SendEmailRequest}, services::mail_service::MailService};
 
 pub fn mail_scope() -> Scope {
-    
-    web::scope("/email")
+    web::scope("/email").configure(config)
+}
+
+pub fn config(cfg: &mut web::ServiceConfig) {
+    cfg
         .service(preview_template)
-        .service(send_email)
+        .service(send_email);
 }
 
 #[get("/preview")]

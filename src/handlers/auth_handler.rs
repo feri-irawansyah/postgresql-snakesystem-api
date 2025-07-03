@@ -11,14 +11,18 @@ const APP_NAME: &str = "snakesystem-api";
 
 pub fn auth_scope() -> Scope {
     
-    web::scope("/auth")
+    web::scope("/auth").configure(config)
+}
+
+pub fn config(cfg: &mut web::ServiceConfig) {
+    cfg
         .service(login)
         .service(check_session)
         .service(register)
         .service(activation)
         .service(reset_password)
         .service(change_password)
-        .service(logout)
+        .service(logout);
 }
 
 #[post("/login")]

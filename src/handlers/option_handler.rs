@@ -3,10 +3,13 @@ use crate::{middleware::{jwt_session::{validate_jwt, Claims}, model::ActionResul
 
 pub fn option_scope() -> Scope {
     
-    web::scope("/options")
-        .service(get_question_npwp)
+    web::scope("/options").configure(config)
+}
+
+pub fn config(cfg: &mut web::ServiceConfig) {
+    cfg.service(get_question_npwp)
         .service(get_options_city)
-        .service(get_options)
+        .service(get_options);
 }
 
 const APP_NAME: &str = "snakesystem-api";
