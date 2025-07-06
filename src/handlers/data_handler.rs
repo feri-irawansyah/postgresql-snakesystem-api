@@ -1,6 +1,6 @@
 use actix_web::{get, web, HttpResponse, Responder, Scope};
 
-use crate::{middleware::model::{ResultList, TableDataParams}, services::data_service::DataService};
+use crate::{middleware::model::{ActionResult, HeaderParams, ResultList, TableDataParams}, services::data_service::DataService};
 
 
 pub fn data_scope() -> Scope {
@@ -10,7 +10,26 @@ pub fn data_scope() -> Scope {
 
 pub fn config(cfg: &mut web::ServiceConfig) {
     cfg
-        .service(get_table);
+        .service(get_table)
+        .service(get_header);
+}
+
+#[get("/header")]
+pub async fn get_header(params: web::Query<HeaderParams>) -> impl Responder {
+
+    let result: ActionResult<Vec<serde_json::Value>, String> = DataService::get_header(params.into_inner().tablename).await;
+
+    match result {
+        response if response.error.is_some() => {
+            HttpResponse::InternalServerError().json(serde_json::json!({"error": response.error}))
+        }, 
+        response if response.result => {
+            HttpResponse::Ok().json(serde_json::json!({"data": response.data}))
+        }, 
+        response => {
+            HttpResponse::BadRequest().json(serde_json::json!({"error": response.message}))
+        }
+    }
 }
 
 #[get("/table")]

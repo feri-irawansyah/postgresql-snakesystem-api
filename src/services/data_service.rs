@@ -4,11 +4,49 @@ use sqlx::Row;
 use sqlx::Column;
 use chrono::{DateTime, NaiveDateTime, Utc};
 use chrono_tz::Asia::Jakarta;
+use crate::middleware::model::ActionResult;
 use crate::{middleware::model::{QueryClass, ResultList, TableDataParams}, CONNECTION};
 
 pub struct DataService;
 
 impl DataService {
+
+    pub async fn get_header(tablename: String) -> ActionResult<Vec<serde_json::Value>, String> {
+        let mut result: ActionResult<Vec<serde_json::Value>, String> = ActionResult::default();
+        let connection: &sqlx::PgPool = CONNECTION.get().unwrap();
+
+        // Panggil PostgreSQL function dan ambil JSON-nya
+        let query = r#"SELECT create_table_object($1) AS result"#;
+
+        match sqlx::query(query)
+            .bind(&tablename)
+            .fetch_one(&*connection)
+            .await
+        {
+            Ok(row) => {
+                let raw_json: serde_json::Value = row.try_get::<serde_json::Value, _>("result").unwrap_or(serde_json::Value::Null);
+
+                match serde_json::from_value(raw_json) {
+                    Ok(parsed_json) => {
+                        result.result = true;
+                        result.data = Some(parsed_json);
+                        result.message = "Data retrieved successfully".to_string();
+                    }
+                    Err(e) => {
+                        result.message = "Failed to parse JSON".to_string();
+                        result.error = Some(e.to_string());
+                    }
+                }
+            }
+            Err(e) => {
+                result.message = "Query failed".to_string();
+                result.error = Some(e.to_string());
+            }
+        }
+
+        result
+    }
+
 
     pub async fn get_table_data(allparams: TableDataParams) -> Result<ResultList, Box<dyn std::error::Error>> {
         let mut result = ResultList {
