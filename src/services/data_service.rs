@@ -254,6 +254,12 @@ impl DataService {
                     .map(|v| serde_json::Value::Array(v.into_iter().map(serde_json::Value::String).collect()))
                     .unwrap_or(serde_json::Value::Null)
             }
+            "INT2[]" | "_INT2" | "INT4[]" | "_INT4" | "INT8[]" | "_INT8" => {
+                let val: Result<Vec<i32>, _> = row.try_get(col);
+                val.ok()
+                    .map(|v| serde_json::Value::Array(v.into_iter().map(|arg0: i32| serde_json::Value::Number(arg0.into())).collect()))
+                    .unwrap_or(serde_json::Value::Array(Vec::new()))
+            }
             "TIMESTAMP" | "TIMESTAMPTZ" | "DATE" => {
                 let val: Result<NaiveDateTime, _> = row.try_get(col);
 
