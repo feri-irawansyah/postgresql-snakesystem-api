@@ -112,7 +112,7 @@ impl DataService {
         }
     
         let tablename = format!("{}", allparams.tablename);
-        let mut query_total_all = format!("SELECT count(*) as total FROM {}", tablename);
+        let mut query_total_all = format!("SELECT count({}) as total FROM {}", tablename, allparams.nidkey.clone().unwrap_or_else(|| "AutoNID".to_string()));
         let mut q_and_where = String::from(" WHERE 1=1 ");
         let mut q_order_by = String::new();
         let mut q_skip_row = String::new();
@@ -139,8 +139,8 @@ impl DataService {
         query_total_all.push_str(&q_and_where);
     
         let query_total_with_filter = format!(
-            "SELECT count(*) as totalWithFilter FROM {} {}",
-            tablename, q_and_where_for_total_with_filter
+            "SELECT count({}) as totalWithFilter FROM {} {}",
+            q_primary_key, tablename, q_and_where_for_total_with_filter
         );
     
         result.query_total_with_filter = query_total_with_filter;
