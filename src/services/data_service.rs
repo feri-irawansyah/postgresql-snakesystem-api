@@ -57,10 +57,10 @@ impl DataService {
 
         let connection: &sqlx::PgPool = CONNECTION.get().unwrap();
 
-        let query = Self::get_query_table(allparams.clone(), false);
+        let query = Self::get_query_table(&allparams, false);
 
         if !allparams.tablename.is_empty() {
-            let rows = sqlx::query(query.query_total_all.clone().as_str())
+            let rows = sqlx::query(query.query_total_all.as_str())
                     .persistent(false)
                     .fetch_optional(connection).await?;
             if let Some(r) = rows {
@@ -71,7 +71,7 @@ impl DataService {
         // Hitung total data yang sesuai filter
         if let Some(filter) = &allparams.filter {
             if filter != "{filter:undefined}" {
-                let row = sqlx::query(query.query_total_with_filter.clone().as_str())
+                let row = sqlx::query(query.query_total_with_filter.as_str())
                 .persistent(false)
                 .fetch_optional(connection).await?;
                 // let row: Option<Row> = client.query(query.query_total_with_filter.clone(), &[]).await?.into_row().await?;
@@ -83,7 +83,7 @@ impl DataService {
             result.total = result.total_not_filtered;
         }
 
-        let rows: Vec<sqlx::postgres::PgRow> = sqlx::query(query.query.clone().as_str())
+        let rows: Vec<sqlx::postgres::PgRow> = sqlx::query(query.query.as_str())
         .persistent(false)
         .fetch_all(connection).await?;
 
@@ -100,7 +100,7 @@ impl DataService {
         Ok(result)
     }
 
-    fn get_query_table(allparams: TableDataParams, bypass_skip: bool) -> QueryClass {
+    fn get_query_table(allparams: &TableDataParams, bypass_skip: bool) -> QueryClass {
         let mut result = QueryClass {
             query: String::new(),
             query_total_all: String::new(),
@@ -112,25 +112,25 @@ impl DataService {
         }
     
         let tablename = format!("{}", allparams.tablename);
-        let mut query_total_all = format!("SELECT count({}) as total FROM {}", tablename, allparams.nidkey.clone().unwrap_or_else(|| "AutoNID".to_string()));
+        let mut query_total_all = format!("SELECT count({}) as total FROM {}", allparams.nidkey.as_deref().unwrap_or_else(|| "AutoNID"), tablename);
         let mut q_and_where = String::from(" WHERE 1=1 ");
         let mut q_order_by = String::new();
         let mut q_skip_row = String::new();
         let mut q_and_where_for_total_with_filter = String::from(" WHERE 1=1 ");
     
         // Gunakan `nidkey` sebagai primary key jika tersedia
-        let q_primary_key = allparams.nidkey.clone().unwrap_or_else(|| "AutoNID".to_string());
-        let q_primary_key_order = q_primary_key.clone();
+        let q_primary_key = allparams.nidkey.as_deref().unwrap_or_else(|| "AutoNID");
+        let q_primary_key_order = q_primary_key;
     
         // Tambahkan filter jika ada
         if let Some(filter) = &allparams.filter {
             if filter != "{filter:undefined}" {
                 if let Ok(filter_name) = serde_json::from_str::<HashMap<String, String>>(filter) {
                     if !filter_name.is_empty() {
-                        let q_and_where_result = Self::get_query_table_where(q_and_where.clone(), filter_name);
+                        let q_and_where_result = Self::get_query_table_where(q_and_where, filter_name);
     
                         q_and_where = q_and_where_result.clone();
-                        q_and_where_for_total_with_filter = q_and_where_result.clone();
+                        q_and_where_for_total_with_filter = q_and_where_result;
                     }
                 }
             }
