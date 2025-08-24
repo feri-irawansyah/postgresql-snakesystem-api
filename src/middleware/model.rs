@@ -261,7 +261,7 @@ pub struct HeaderParams {
     pub tablename: String,
 }
 
-#[derive(Debug, Clone, Deserialize, IntoParams)]
+#[derive(Debug, Clone, Deserialize, Serialize, IntoParams)]
 pub struct TableDataParams {
     pub tablename: String,
     pub limit: i32,
@@ -281,7 +281,7 @@ pub struct QueryClass {
     pub query_total_with_filter: String,
 }
 
-#[derive(Debug, Serialize, ToSchema)]
+#[derive(Debug, Serialize, Deserialize, ToSchema, Clone)]
 pub struct ResultList {
     pub total_not_filtered: i64,
     pub total: i64,

@@ -1,7 +1,8 @@
 use actix_web::{error, HttpRequest, HttpResponse, Responder};
 use rand::{rng, Rng};
-use crate::middleware::model::ActionResult;
+use crate::middleware::model::{ActionResult, TableDataParams};
 use chrono::TimeZone;
+use sha2::{Sha256, Digest};
 
 pub struct GenericService;
 
@@ -134,6 +135,18 @@ impl GenericService {
         let timestamp = jakarta_time.naive_local(); 
 
         return timestamp
+    }
+
+    pub fn make_cache_key(table_name: &str, params: &TableDataParams) -> String {
+        // Serialize params jadi string
+        let params_str = serde_json::to_string(params).unwrap();
+
+        // Hash params biar pendek & unik
+        let mut hasher = Sha256::default();
+        hasher.update(params_str.as_bytes());
+        let hash = format!("{:x}", hasher.finalize());
+
+        format!("table:{}:{}", table_name, hash)
     }
 
 }

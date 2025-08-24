@@ -1,10 +1,13 @@
 use std::collections::HashMap;
 use std::fmt::Write;
+use redis::aio::ConnectionManager;
+use redis::AsyncCommands;
 use sqlx::Row;
 use sqlx::Column;
 use chrono::{DateTime, NaiveDateTime, Utc};
 use chrono_tz::Asia::Jakarta;
 use crate::middleware::model::ActionResult;
+use crate::REDIS_CLIENT;
 use crate::{middleware::model::{QueryClass, ResultList, TableDataParams}, CONNECTION};
 
 pub struct DataService;
@@ -47,6 +50,39 @@ impl DataService {
         result
     }
 
+    pub async fn get_cache_data(cache_key: &str) -> Result<ResultList, Box<dyn std::error::Error>> {
+
+        let mut result = ResultList {
+            total_not_filtered: 0,
+            total: 0,
+            rows: vec![],
+        };
+
+        let connection: ConnectionManager = REDIS_CLIENT.get().expect("Redis not initialized").clone();
+
+        let data: Option<String> = connection.clone().get(cache_key).await?;
+
+        if data.is_some() {
+            result = serde_json::from_str(data.unwrap().as_str()).unwrap();
+        }
+        
+        Ok(result)
+    }
+
+    pub async fn set_cache_data(cache_key: &str, data: &ResultList, ttl_secs: usize) -> Result<String, redis::RedisError> {
+        let mut connection: ConnectionManager = REDIS_CLIENT.get().expect("Redis not initialized").clone();
+
+        let serialized = serde_json::to_string(data).unwrap();
+
+        // kasih tipe generic return jadi ()
+        if let Err(e) = connection
+            .set_ex::<&str, String, ()>(cache_key, serialized, ttl_secs.try_into().unwrap())
+            .await {
+                return Err(e);
+            };
+
+        Ok("Cache saved".to_string())
+    }
 
     pub async fn get_table_data(allparams: TableDataParams) -> Result<ResultList, Box<dyn std::error::Error>> {
         let mut result = ResultList {
