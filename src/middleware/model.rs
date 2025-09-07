@@ -314,3 +314,16 @@ pub struct SendEmailRequest {
     pub title: String,
     pub otp_code: i32,
 }
+
+/// Data yang bakal dikembalikan Google saat tuker token
+#[derive(Debug, Deserialize)]
+pub struct GoogleUserInfo {
+    pub id: String,
+    pub email: String,
+    pub verified_email: bool,
+    pub name: Option<String>,
+    pub given_name: Option<String>,
+    pub family_name: Option<String>,
+    pub picture: Option<String>,
+    pub locale: Option<String>,
+}

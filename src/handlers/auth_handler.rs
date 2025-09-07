@@ -1,10 +1,10 @@
 use actix_web::{cookie::{time, Cookie, SameSite}, post, get, web, HttpRequest, HttpResponse, Responder, Scope};
+use oauth2::{AuthUrl, AuthorizationCode, ClientId, ClientSecret, CsrfToken, DeviceAuthorizationUrl, PkceCodeChallenge, RedirectUrl, TokenResponse, TokenUrl, basic::BasicClient};
 use validator::Validate;
 
-use crate::{middleware::{
-    jwt_session::{create_jwt, validate_jwt, Claims}, 
-    model::{ActionResult, ChangePasswordRequest, LoginRequest, RegisterRequest, ResetPasswordRequest}},
-    services::{auth_service::AuthService, generic_service::GenericService
+use crate::{AppState, SECRETS, middleware::{
+    jwt_session::{Claims, create_jwt, validate_jwt}, 
+    model::{ActionResult, ChangePasswordRequest, LoginRequest, RegisterRequest, ResetPasswordRequest}}, services::{auth_service::AuthService, generic_service::GenericService
 }};
 
 const APP_NAME: &str = "snakesystem-api";
@@ -22,7 +22,9 @@ pub fn config(cfg: &mut web::ServiceConfig) {
         .service(activation)
         .service(reset_password)
         .service(change_password)
-        .service(logout);
+        .service(logout)
+        .service(google_login)
+        .service(google_callback);
 }
 
 #[post("/login")]
@@ -283,4 +285,108 @@ async fn logout(req: HttpRequest) -> impl Responder {
         },
     }
     
+}
+
+#[get("/google/login")]
+async fn google_login(data: web::Data<AppState>) -> impl Responder {
+
+    let secrets = SECRETS.get().expect("SECRETS not initialized");
+    let client_id = secrets.get("GOOGLE_ID").expect("secret was not found");
+    let client_secret = secrets.get("GOOGLE_SECRET").expect("secret was not found");
+    let domain = secrets.get("DOMAIN").expect("secret was not found");
+
+    let redirect_url = format!("{}/api/v1/auth/google/callback", domain);
+
+    let client = BasicClient::new(ClientId::new(client_id.to_string()),)
+    .set_client_secret(ClientSecret::new(client_secret.to_string()))
+    .set_auth_uri(AuthUrl::new("https://accounts.google.com/o/oauth2/auth".to_string()).unwrap())
+    .set_token_uri(TokenUrl::new("https://oauth2.googleapis.com/token".to_string()).unwrap())
+    // Set the URL the user will be redirected to after the authorization process.
+    .set_redirect_uri(RedirectUrl::new(redirect_url).unwrap());
+
+    // PKCE
+    let (pkce_challenge, pkce_verifier) = PkceCodeChallenge::new_random_sha256();
+
+    // URL + CSRF Token
+    let (auth_url, csrf_token) = client
+        .authorize_url(CsrfToken::new_random)
+        // .add_scope(oauth2::Scope::new("read".to_string()))
+        .add_scope(oauth2::Scope::new("openid".to_string()))
+        .add_scope(oauth2::Scope::new("email".to_string()))
+        .add_scope(oauth2::Scope::new("profile".to_string()))
+        .set_pkce_challenge(pkce_challenge)
+        .url();
+
+    // Simpan csrf + pkce ke AppState (Arc<Mutex<...>>)
+    {
+        let mut store = data.oauth_store.lock().unwrap();
+        store.insert(csrf_token.secret().to_string(), (csrf_token.clone(), pkce_verifier));
+    }
+
+    HttpResponse::Found()
+        .append_header(("Location", auth_url.to_string()))
+        .finish()
+}
+
+#[get("/google/callback")]
+async fn google_callback(query: web::Query<std::collections::HashMap<String,String> >, data: web::Data<AppState>) -> impl Responder {
+    let secrets = SECRETS.get().expect("SECRETS not initialized");
+    let client_id = secrets.get("GOOGLE_ID").expect("secret was not found");
+    let client_secret = secrets.get("GOOGLE_SECRET").expect("secret was not found");
+    let domain = secrets.get("DOMAIN").expect("secret was not found");
+
+    let redirect_url = format!("{}/api/v1/auth/google/callback", domain);
+
+    let client = BasicClient::new(ClientId::new(client_id.to_string()))
+        .set_client_secret(ClientSecret::new(client_secret.to_string()))
+        .set_device_authorization_url(DeviceAuthorizationUrl::new("https://oauth2.googleapis.com/device/code".into()).unwrap())
+        .set_auth_uri(AuthUrl::new("https://accounts.google.com/o/oauth2/v2/auth".into()).unwrap())
+        .set_token_uri(TokenUrl::new("https://oauth2.googleapis.com/token".into()).unwrap())
+        .set_redirect_uri(RedirectUrl::new(redirect_url).unwrap());
+
+    // ambil query params (cek ada atau nggak)
+    let code = match query.get("code") {
+        Some(c) => c.clone(),
+        None => return HttpResponse::BadRequest().body("Missing code"),
+    };
+    let state = match query.get("state") {
+        Some(s) => s.clone(),
+        None => return HttpResponse::BadRequest().body("Missing state"),
+    };
+
+    // ambil & hapus pair dari store (one-time use)
+    let pair_opt = {
+        let mut store = data.oauth_store.lock().unwrap();
+        store.remove(&state)
+    };
+
+    let (csrf_token, pkce_verifier) = match pair_opt {
+        Some(pair) => pair,
+        None => return HttpResponse::BadRequest().body("Invalid or expired state"),
+    };
+
+    // verifikasi CSRF
+    if csrf_token.secret() != &state {
+        return HttpResponse::Unauthorized().body("Invalid CSRF token");
+    }
+
+    // exchange code -> token (async)
+    let http_client = oauth2::reqwest::ClientBuilder::new()
+        .redirect(oauth2::reqwest::redirect::Policy::none())
+        .build()
+        .unwrap();
+
+    let token_result = client
+        .exchange_code(AuthorizationCode::new(code))
+        .set_pkce_verifier(pkce_verifier)
+        .request_async(&http_client)
+        .await;
+
+    match token_result {
+        Ok(token) => {
+            let access_token = token.access_token().secret();
+            HttpResponse::Ok().body(format!("Access token: {}", access_token))
+        }
+        Err(err) => HttpResponse::InternalServerError().body(format!("Error: {:?}", err)),
+    }
 }

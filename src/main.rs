@@ -10,6 +10,7 @@ use sqlx::{PgPool, postgres::PgPoolOptions};
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 use once_cell::sync::OnceCell;
+use std::{collections::HashMap, sync::{Arc, Mutex}};
 
 use crate::{handlers::{data_handler::data_scope, library_handler::library_scope, user_handler::user_scope}, middleware::redis::redis_scope};
 
@@ -21,6 +22,12 @@ pub static REDIS_CLIENT: OnceCell<ConnectionManager> = OnceCell::new();
 async fn hello_world() -> impl Responder {
         
     format!("Hello World! DB returns")
+}
+
+#[derive(Clone)]
+pub struct AppState {
+    // now Clone because Arc is Clone
+    pub oauth_store: Arc<Mutex<HashMap<String, (oauth2::CsrfToken, oauth2::PkceCodeVerifier)>>>,
 }
 
 mod middleware {
@@ -62,6 +69,10 @@ async fn main(
 ) -> ShuttleActixWeb<impl FnOnce(&mut ServiceConfig) + Send + Clone + 'static> {
     let db_url = secrets.get("DATABASE_URL").expect("DB URL not found");
     let redis_url = secrets.get("REDIS_URL").expect("DB URL not found");
+
+    let state = AppState {
+        oauth_store: Arc::new(Mutex::new(HashMap::new())),
+    };
 
     let pool = match PgPoolOptions::new()
         .max_connections(10)
@@ -121,7 +132,7 @@ async fn main(
                 SwaggerUi::new("/docs/{_:.*}")
                     .url("/api-docs/openapi.json", Swagger::openapi()),
             )
-            .app_data(web::Data::new(secrets.clone()))
+            .app_data(web::Data::new(state.clone()))
             .app_data(web::JsonConfig::default().error_handler(GenericService::json_error_handler))
             .default_service(route().to(GenericService::not_found));
     };
