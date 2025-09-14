@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 use std::fmt::Write;
-use redis::aio::ConnectionManager;
-use redis::AsyncCommands;
+use redis::Commands;
 use sqlx::Row;
 use sqlx::Column;
 use chrono::{DateTime, NaiveDateTime, Utc};
@@ -58,9 +57,9 @@ impl DataService {
             rows: vec![],
         };
 
-        let connection: ConnectionManager = REDIS_CLIENT.get().expect("Redis not initialized").clone();
+        let connection = REDIS_CLIENT.get().expect("Redis not initialized").clone();
 
-        let data: Option<String> = connection.clone().get(cache_key).await?;
+        let data: Option<String> = connection.clone().get(cache_key)?;
 
         if data.is_some() {
             result = serde_json::from_str(data.unwrap().as_str()).unwrap();
@@ -70,14 +69,14 @@ impl DataService {
     }
 
     pub async fn set_cache_data(cache_key: &str, data: &ResultList, ttl_secs: usize) -> Result<String, redis::RedisError> {
-        let mut connection: ConnectionManager = REDIS_CLIENT.get().expect("Redis not initialized").clone();
+        let mut connection = REDIS_CLIENT.get().expect("Redis not initialized").clone();
 
         let serialized = serde_json::to_string(data).unwrap();
 
         // kasih tipe generic return jadi ()
         if let Err(e) = connection
             .set_ex::<&str, String, ()>(cache_key, serialized, ttl_secs.try_into().unwrap())
-            .await {
+             {
                 return Err(e);
             };
 

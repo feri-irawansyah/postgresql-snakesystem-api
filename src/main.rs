@@ -2,7 +2,7 @@ use actix_cors::Cors;
 use actix_web::{get, http, web::{self, route, ServiceConfig}, Responder};
 use docs::swagger::{health_check, Swagger};
 use handlers::{auth_handler::auth_scope, mail_handler::mail_scope, option_handler::option_scope};
-use redis::{aio::ConnectionManager, Client};
+use redis::Client;
 use services::generic_service::GenericService;
 use shuttle_actix_web::ShuttleActixWeb;
 use shuttle_runtime::SecretStore;
@@ -16,7 +16,7 @@ use crate::{handlers::{data_handler::data_scope, library_handler::library_scope,
 
 pub static CONNECTION: OnceCell<PgPool> = OnceCell::new();
 pub static SECRETS: OnceCell<SecretStore> = OnceCell::new();
-pub static REDIS_CLIENT: OnceCell<ConnectionManager> = OnceCell::new();
+pub static REDIS_CLIENT: OnceCell<Client> = OnceCell::new();
 
 #[get("/")]
 async fn hello_world() -> impl Responder {
@@ -93,20 +93,9 @@ async fn main(
 
     let redis_client = Client::open(redis_url).expect("Invalid Redis URL");
 
-    let redis_pool = match ConnectionManager::new(redis_client).await {
-        Ok(c) => {
-            println!("Redis connected");
-            c
-        },
-        Err(e) => {
-            eprintln!("Failed to connect to DB: {}", e);
-            panic!("DB connection error");
-        }
-    };
-
     CONNECTION.set(pool.clone()).expect("Failed to set DB_POOL");
     SECRETS.set(secrets.clone()).unwrap_or_else(|_| panic!("Failed to set SECRETS"));
-    REDIS_CLIENT.set(redis_pool.clone()).unwrap_or_else(|_| panic!("Failed to set REDIS_CLIENT"));
+    REDIS_CLIENT.set(redis_client).unwrap_or_else(|_| panic!("Failed to set REDIS_CLIENT"));
 
     let config = move |cfg: &mut ServiceConfig| {
         let cors = Cors::default()

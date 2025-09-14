@@ -1,5 +1,5 @@
 use actix_web::{get, delete, put, web, HttpResponse, Responder, Scope};
-use redis::AsyncCommands;
+use redis::Commands;
 use serde::Deserialize;
 
 use crate::REDIS_CLIENT;
@@ -77,8 +77,8 @@ impl RedisService {
             .clone();
 
         let mut keys: Vec<String> = Vec::new();
-        let mut iter = conn.scan_match::<String, String>(pattern.to_owned()).await?;
-        while let Some(key) = iter.next_item().await {
+        let mut iter = conn.scan_match::<String, String>(pattern.to_owned())?;
+        while let Some(key) = iter.next() {
             keys.push(key);
         }
 
@@ -91,7 +91,7 @@ impl RedisService {
             .expect("Redis not initialized")
             .clone();
 
-        conn.get(key).await
+        conn.get(key)
     }
 
     pub async fn delete_key(key: &str) -> Result<(), redis::RedisError> {
@@ -100,7 +100,7 @@ impl RedisService {
             .expect("Redis not initialized")
             .clone();
 
-        conn.del::<_, ()>(key).await
+        conn.del::<_, ()>(key)
     }
 
     pub async fn clear_all() -> Result<(), redis::RedisError> {
@@ -109,7 +109,7 @@ impl RedisService {
             .expect("Redis not initialized")
             .clone();
 
-        conn.flushdb::<()>().await
+        conn.flushdb::<()>()
     }
 
     pub async fn update_key(
@@ -123,8 +123,8 @@ impl RedisService {
             .clone();
 
         match ttl {
-            Some(seconds) => conn.set_ex::<_, _, ()>(key, value, seconds.try_into().unwrap()).await?,
-            None => conn.set::<_, _, ()>(key, value).await?,
+            Some(seconds) => conn.set_ex::<_, _, ()>(key, value, seconds.try_into().unwrap())?,
+            None => conn.set::<_, _, ()>(key, value)?,
         }
 
         Ok(())
