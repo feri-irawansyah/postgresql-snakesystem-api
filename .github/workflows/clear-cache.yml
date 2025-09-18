@@ -1,4 +1,4 @@
-name: Call Shuttle
+name: Redis Cache Refresh
 
 on:
   schedule:
@@ -9,6 +9,28 @@ jobs:
   refresh-cache:
     runs-on: ubuntu-latest
     steps:
-      - name: Call Shuttle
+      - name: Clear Redis cache
         run: |
-          curl -s -f -X GET https://snakesystem-api.shuttle.app
+          curl -s -f -X DELETE https://snakesystem-api.shuttle.app/api/v1/redis/clear
+
+  preload:
+    runs-on: ubuntu-latest
+    needs: refresh-cache
+    strategy:
+      matrix:
+        endpoint:
+          - "https://snakesystem-api.shuttle.app/api/v1/data/table?tablename=notes&offset=0&limit=3&nidkey=notes_id&sort=last_update&order=desc"
+          - "https://snakesystem-api.shuttle.app/api/v1/data/table?tablename=skills&offset=0&limit=50&nidkey=skill_id&sort=skill_id&order=asc"
+          - "https://snakesystem-api.shuttle.app/api/v1/data/table?tablename=skills&offset=0&limit=100&nidkey=skill_id&sort=skill_id&order=asc"
+          - "https://snakesystem-api.shuttle.app/api/v1/data/table?tablename=portfolio&offset=0&limit=9&nidkey=portfolio_id&sort=last_update&order=desc"
+          - "https://snakesystem-api.shuttle.app/api/v1/data/table?tablename=notes&offset=0&limit=9&nidkey=notes_id&filter=%7B%22category%22:%22backend%22%7D"
+          - "https://snakesystem-api.shuttle.app/api/v1/data/table?tablename=notes&offset=0&limit=9&nidkey=notes_id&filter=%7B%22category%22:%22series%22%7D"
+          - "https://snakesystem-api.shuttle.app/api/v1/data/table?tablename=notes&offset=0&limit=9&nidkey=notes_id&filter=%7B%22category%22:%22frontend%22%7D"
+          - "https://snakesystem-api.shuttle.app/api/v1/data/table?tablename=notes&offset=0&limit=9&nidkey=notes_id&filter=%7B%22category%22:%22fullstack%22%7D"
+          - "https://snakesystem-api.shuttle.app/api/v1/data/table?tablename=notes&offset=0&limit=9&nidkey=notes_id&filter=%7B%22category%22:%22devops%22%7D"
+          - "https://snakesystem-api.shuttle.app/api/v1/data/table?tablename=notes&offset=0&limit=9&nidkey=notes_id&filter=%7B%22category%22:%22random%22%7D"
+          - "https://snakesystem-api.shuttle.app/api/v1/data/table?tablename=skills&offset=0&limit=20&nidkey=skill_id&sort=skill_id&order=asc"
+    steps:
+      - name: Preload ${{ matrix.endpoint }}
+        run: |
+          curl -s -f --retry 3 --retry-delay 5 "${{ matrix.endpoint }}" > /dev/null
